@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tienda Virtual — Compra en Amazon y Shein desde aquí</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+  <div class="airmail-bar" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand">
+        <span class="brand-mark">✈</span>
+        <span class="brand-name">Tienda Virtual</span>
+      </div>
+      <nav class="nav" id="appNav" hidden>
+        <button class="nav-link" data-view="search">Buscar</button>
+        <button class="nav-link" data-view="cart">Carrito <span id="cartCount" class="cart-count">0</span></button>
+        <button class="nav-link" data-view="orders">Mis cotizaciones</button>
+        <button class="nav-link nav-exit" id="logoutBtn">Salir</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- ===== AUTH ===== -->
+    <section id="view-auth" class="view">
+      <div class="auth-card">
+        <p class="eyebrow">Compra por encargo</p>
+        <h1>Trae lo que quieras<br>de Amazon o Shein.</h1>
+        <p class="lede">Pega el link o el ASIN, te calculamos el precio con envío incluido, y nosotros hacemos la compra por ti.</p>
+
+        <div class="auth-tabs">
+          <button class="auth-tab is-active" data-tab="login">Ya tengo cuenta</button>
+          <button class="auth-tab" data-tab="register">Soy nuevo</button>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+          <label>Correo<input type="email" name="email" required autocomplete="email"></label>
+          <label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label>
+          <button type="submit" class="btn btn-primary">Entrar</button>
+          <p class="form-error" data-error-for="loginForm"></p>
+        </form>
+
+        <form id="registerForm" class="auth-form" hidden>
+          <label>Nombre<input type="text" name="name" required autocomplete="name"></label>
+          <label>Correo<input type="email" name="email" required autocomplete="email"></label>
+          <label>Contraseña<input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
+          <button type="submit" class="btn btn-primary">Crear cuenta</button>
+          <p class="form-error" data-error-for="registerForm"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== SEARCH (hero) ===== -->
+    <section id="view-search" class="view" hidden>
+      <div class="hero-search">
+        <p class="eyebrow">Nueva búsqueda</p>
+        <h1>¿Qué quieres traer?</h1>
+        <p class="lede">Pega el link del producto (Shein) o el ASIN (Amazon). Un carrito solo puede tener artículos de una tienda a la vez.</p>
+
+        <form id="searchForm" class="search-form">
+          <div class="source-toggle" role="radiogroup" aria-label="Tienda">
+            <button type="button" class="source-btn is-active" data-source="amazon">Amazon<span class="source-hint">ASIN</span></button>
+            <button type="button" class="source-btn" data-source="shein">Shein<span class="source-hint">Link del producto</span></button>
+          </div>
+          <div class="search-row">
+            <input type="text" id="searchInput" placeholder="B0BSHF7WHW" required>
+            <button type="submit" class="btn btn-primary">Cotizar producto</button>
+          </div>
+          <p class="form-error" data-error-for="searchForm"></p>
+        </form>
+
+        <div id="searchResult" class="result-card" hidden>
+          <img id="resultImg" alt="">
+          <div class="result-body">
+            <p class="result-source" id="resultSource"></p>
+            <h3 id="resultTitle"></h3>
+            <div class="result-prices">
+              <span class="price-origin">Precio origen <strong id="resultPriceOrigin"></strong></span>
+              <span class="price-final">Tu precio <strong id="resultPriceFinal"></strong></span>
+            </div>
+            <button id="addToCartBtn" class="btn btn-stamp">Agregar al carrito</button>
+            <p class="form-error" id="addToCartError"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="steps">
+        <div class="step"><span class="step-n">1</span><p>Pega el link o ASIN y consulta el precio real</p></div>
+        <div class="step"><span class="step-n">2</span><p>Agrégalo al carrito — mismos productos, misma tienda</p></div>
+        <div class="step"><span class="step-n">3</span><p>Confirma la cotización y espera el costo de envío</p></div>
+      </div>
+    </section>
+
+    <!-- ===== CART ===== -->
+    <section id="view-cart" class="view" hidden>
+      <p class="eyebrow">Carrito activo</p>
+      <h1>Lista de empaque</h1>
+
+      <div id="cartEmpty" class="empty-state">
+        <p>Todavía no has agregado nada. Ve a <button class="link-btn" data-view="search">Buscar</button> para empezar.</p>
+      </div>
+
+      <ul id="cartList" class="manifest"></ul>
+
+      <div id="cartFooter" class="manifest-footer" hidden>
+        <div class="manifest-total">
+          <span>Subtotal</span>
+          <strong id="cartSubtotal"></strong>
+        </div>
+        <button id="confirmCartBtn" class="btn btn-stamp btn-block">Confirmar cotización</button>
+        <p class="form-error" id="confirmCartError"></p>
+      </div>
+    </section>
+
+    <!-- ===== ORDERS ===== -->
+    <section id="view-orders" class="view" hidden>
+      <p class="eyebrow">Historial</p>
+      <h1>Mis cotizaciones</h1>
+      <div id="ordersEmpty" class="empty-state" hidden>
+        <p>Todavía no tienes cotizaciones confirmadas.</p>
+      </div>
+      <div id="ordersContent"></div>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
