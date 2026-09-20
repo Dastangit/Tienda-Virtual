@@ -1,0 +1,7 @@
+node_modules/
+.env
+
+# Artefactos de pruebas locales (logs, PID, respuestas de prueba de APIs)
+scripts/*.log
+scripts/*.pid
+scripts/*_test_response*.json
