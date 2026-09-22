@@ -7,7 +7,6 @@ const TOKEN_KEY = 'tv_token';
 const state = {
   token: localStorage.getItem(TOKEN_KEY) || null,
   source: 'amazon',
-  lastResult: null, // último producto buscado (para agregar al carrito)
 };
 
 // ---------- helpers ----------
@@ -29,6 +28,12 @@ function toast(msg) {
 function setError(formId, msg) {
   const el = document.querySelector(`[data-error-for="${formId}"]`) || $(`#${formId}`);
   if (el) el.textContent = msg || '';
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
 
 async function api(path, options = {}) {
@@ -128,68 +133,102 @@ function onLoggedIn() {
   refreshCartCount();
 }
 
-// ---------- search ----------
+// ---------- search (por palabra clave) ----------
 $all('.source-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     $all('.source-btn').forEach(b => b.classList.remove('is-active'));
     btn.classList.add('is-active');
     state.source = btn.dataset.source;
-    $('#searchInput').placeholder = state.source === 'amazon'
-      ? 'B0BSHF7WHW'
-      : 'https://us.shein.com/producto-p-12345.html';
-    $('#searchResult').hidden = true;
-    state.lastResult = null;
+    $('#searchResults').hidden = true;
+    $('#resultsCount').hidden = true;
   });
 });
 
 $('#searchForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   setError('searchForm', '');
-  $('#searchResult').hidden = true;
-  const originalId = $('#searchInput').value.trim();
-  if (!originalId) return;
+  const query = $('#searchInput').value.trim();
+  if (!query) return;
 
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Consultando…';
+  submitBtn.textContent = 'Buscando…';
+  $('#searchResults').hidden = true;
+  $('#resultsCount').hidden = true;
 
   try {
-    const data = await api('/api/search', {
+    const data = await api('/api/search/query', {
       method: 'POST',
-      body: JSON.stringify({ originalId, source: state.source })
+      body: JSON.stringify({ query, source: state.source })
     });
-    const p = data.data;
-    state.lastResult = { originalId: p.originalId, source: p.source };
-
-    $('#resultImg').src = (p.images && p.images[0]) || '';
-    $('#resultSource').textContent = p.source.toUpperCase();
-    $('#resultTitle').textContent = p.title;
-    $('#resultPriceOrigin').textContent = money(p.price);
-    $('#resultPriceFinal').textContent = money(p.precioFinalCliente);
-    $('#addToCartError').textContent = '';
-    $('#searchResult').hidden = false;
+    renderSearchResults(data.resultados || []);
   } catch (err) {
     setError('searchForm', err.message);
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Cotizar producto';
+    submitBtn.textContent = 'Buscar';
   }
 });
 
-$('#addToCartBtn').addEventListener('click', async () => {
-  if (!state.lastResult) return;
-  $('#addToCartError').textContent = '';
+function renderSearchResults(resultados) {
+  const grid = $('#searchResults');
+  const count = $('#resultsCount');
+  grid.innerHTML = '';
+
+  if (resultados.length === 0) {
+    count.hidden = false;
+    count.textContent = 'No encontramos productos para esa búsqueda. Prueba con otras palabras.';
+    grid.hidden = true;
+    return;
+  }
+
+  count.hidden = false;
+  count.textContent = `${resultados.length} resultados`;
+
+  resultados.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'result-item';
+    card.innerHTML = `
+      <img src="${item.image || ''}" alt="" loading="lazy">
+      <div class="result-item-body">
+        <p class="result-item-title">${escapeHtml(item.title)}</p>
+        <span class="result-item-price">${money(item.precioFinalCliente)}</span>
+        <button class="btn btn-stamp btn-sm add-result-btn">Agregar</button>
+        <p class="form-error"></p>
+      </div>
+    `;
+    const btn = card.querySelector('.add-result-btn');
+    const errEl = card.querySelector('.form-error');
+    btn.addEventListener('click', () => addResultToCart(item, btn, errEl));
+    grid.appendChild(card);
+  });
+
+  grid.hidden = false;
+}
+
+async function addResultToCart(item, btn, errEl) {
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Agregando…';
   try {
+    // Recotizamos por ID exacto: confirma stock/precio actual y lo cachea antes de agregarlo.
+    await api('/api/search', {
+      method: 'POST',
+      body: JSON.stringify({ originalId: item.originalId, source: item.source })
+    });
     await api('/api/carrito', {
       method: 'POST',
-      body: JSON.stringify(state.lastResult)
+      body: JSON.stringify({ originalId: item.originalId, source: item.source })
     });
     toast('Agregado al carrito');
     refreshCartCount();
+    btn.textContent = 'Agregado ✓';
   } catch (err) {
-    $('#addToCartError').textContent = err.message;
+    errEl.textContent = err.message;
+    btn.disabled = false;
+    btn.textContent = 'Agregar';
   }
-});
+}
 
 // ---------- cart ----------
 async function refreshCartCount() {
@@ -308,12 +347,6 @@ async function renderOrders() {
       ${t.estado === 'pagado' ? `<p class="manifest-item-price" style="margin-top:8px">Subtotal ${money(t.desglose.subtotal)} + envío ${money(t.desglose.envio)}</p>` : ''}
     </div>
   `;
-}
-
-function escapeHtml(str) {
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
 }
 
 // ---------- boot ----------

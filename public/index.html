@@ -35,7 +35,7 @@
       <div class="auth-card">
         <p class="eyebrow">Compra por encargo</p>
         <h1>Trae lo que quieras<br>de Amazon o Shein.</h1>
-        <p class="lede">Pega el link o el ASIN, te calculamos el precio con envío incluido, y nosotros hacemos la compra por ti.</p>
+        <p class="lede">Busca por nombre, te mostramos el precio con margen incluido, y nosotros hacemos la compra por ti.</p>
 
         <div class="auth-tabs">
           <button class="auth-tab is-active" data-tab="login">Ya tengo cuenta</button>
@@ -64,37 +64,26 @@
       <div class="hero-search">
         <p class="eyebrow">Nueva búsqueda</p>
         <h1>¿Qué quieres traer?</h1>
-        <p class="lede">Pega el link del producto (Shein) o el ASIN (Amazon). Un carrito solo puede tener artículos de una tienda a la vez.</p>
+        <p class="lede">Escribe lo que buscas. Un carrito solo puede tener artículos de una tienda a la vez.</p>
 
         <form id="searchForm" class="search-form">
           <div class="source-toggle" role="radiogroup" aria-label="Tienda">
-            <button type="button" class="source-btn is-active" data-source="amazon">Amazon<span class="source-hint">ASIN</span></button>
-            <button type="button" class="source-btn" data-source="shein">Shein<span class="source-hint">Link del producto</span></button>
+            <button type="button" class="source-btn is-active" data-source="amazon">Amazon</button>
+            <button type="button" class="source-btn" data-source="shein">Shein</button>
           </div>
           <div class="search-row">
-            <input type="text" id="searchInput" placeholder="B0BSHF7WHW" required>
-            <button type="submit" class="btn btn-primary">Cotizar producto</button>
+            <input type="text" id="searchInput" placeholder="audífonos inalámbricos" required>
+            <button type="submit" class="btn btn-primary">Buscar</button>
           </div>
           <p class="form-error" data-error-for="searchForm"></p>
         </form>
 
-        <div id="searchResult" class="result-card" hidden>
-          <img id="resultImg" alt="">
-          <div class="result-body">
-            <p class="result-source" id="resultSource"></p>
-            <h3 id="resultTitle"></h3>
-            <div class="result-prices">
-              <span class="price-origin">Precio origen <strong id="resultPriceOrigin"></strong></span>
-              <span class="price-final">Tu precio <strong id="resultPriceFinal"></strong></span>
-            </div>
-            <button id="addToCartBtn" class="btn btn-stamp">Agregar al carrito</button>
-            <p class="form-error" id="addToCartError"></p>
-          </div>
-        </div>
+        <p id="resultsCount" class="results-count" hidden></p>
+        <div id="searchResults" class="results-grid" hidden></div>
       </div>
 
       <div class="steps">
-        <div class="step"><span class="step-n">1</span><p>Pega el link o ASIN y consulta el precio real</p></div>
+        <div class="step"><span class="step-n">1</span><p>Escribe lo que buscas y elige un resultado</p></div>
         <div class="step"><span class="step-n">2</span><p>Agrégalo al carrito — mismos productos, misma tienda</p></div>
         <div class="step"><span class="step-n">3</span><p>Confirma la cotización y espera el costo de envío</p></div>
       </div>
