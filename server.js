@@ -2,6 +2,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const path = require('path');
 
 // Importamos nuestra propia función de conexión a la base de datos
 const connectDB = require('./config/db');
@@ -16,18 +17,20 @@ connectDB();
 const app = express();
 
 // 4. MIDDLEWARES: Configuraciones intermedias (los "porteros")
-// cors() permite que tu futuro frontend (PWA) se comunique con este backend sin ser bloqueado
 app.use(cors());
-// express.json() es un traductor: convierte los datos que lleguen por internet en un formato que Node.js entiende
 app.use(express.json());
+
+// ---> FRONTEND (archivos estaticos: index.html, css, js) <---
+app.use(express.static(path.join(__dirname, 'public')));
+// ---------------------------------------------------
 
 // ---> AQUI CONECTAMOS TU NUEVO MOTOR DE BÚSQUEDA <---
 const searchRoutes = require('./routes/searchRoutes');
 app.use('/api/search', searchRoutes);
 // ---------------------------------------------------
 
-// 5. RUTA DE PRUEBA: Creamos una dirección temporal para saber que el servidor responde
-app.get('/', (req, res) => {
+// 5. RUTA DE SALUD: para confirmar que el backend responde (independiente del frontend)
+app.get('/api/health', (req, res) => {
     res.json({ mensaje: 'El motor del Proxy Shopping está en línea y esperando órdenes.' });
 });
 

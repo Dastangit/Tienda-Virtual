@@ -16,7 +16,6 @@ const obtenerCarrito = async (req, res) => {
     }
 };
 
-// 2. AGREGAR PRODUCTO AL CARRITO
 // 2. AGREGAR PRODUCTO AL CARRITO (Con separación de Fuentes)
 const agregarAlCarrito = async (req, res) => {
     try {
@@ -50,10 +49,7 @@ const agregarAlCarrito = async (req, res) => {
             });
         } else if (carrito.items.length > 0) {
             // REGLA DE NEGOCIO: No mezclar Amazon con Shein
-            // Miramos de qué tienda es el primer producto que ya está en el carrito
             const fuenteActual = carrito.items[0].source;
-            
-            // Si la tienda del producto nuevo no coincide con la tienda del carrito...
             if (fuenteActual !== source) {
                 return res.status(400).json({ 
                     error: `No puedes mezclar productos. Este carrito ya contiene artículos de ${fuenteActual.toUpperCase()}. Termina esta cotización para empezar a comprar en ${source.toUpperCase()}.` 
@@ -61,7 +57,6 @@ const agregarAlCarrito = async (req, res) => {
             }
         }
 
-        // Si pasa la prueba (o es el primer producto), lo metemos al carrito
         carrito.items.push({ originalId, source, title, price, precioFinalCliente, image });
         await carrito.save();
 
@@ -164,16 +159,13 @@ const generarTicket = async (req, res) => {
             return res.status(404).json({ error: 'No tienes órdenes en proceso de cotización.' });
         }
 
-        // Regla estricta de separación: identificamos la tienda de todo el pedido
         const fuente = carrito.items[0].source.toUpperCase();
-
-        // Calculamos el subtotal de todos los productos
         const subtotal = carrito.items.reduce((acc, item) => acc + item.precioFinalCliente, 0);
 
-        // Armamos un JSON perfectamente estructurado para que el Frontend dibuje el recibo
         const ticket = {
             numeroOrden: carrito._id,
             fecha: carrito.updatedAt,
+            estado: carrito.status, // 'cotizando' (esperando envío) o 'pagado' (envío ya asignado)
             tiendaOrigen: fuente,
             productos: carrito.items.map(item => ({
                 titulo: item.title,
@@ -181,7 +173,8 @@ const generarTicket = async (req, res) => {
             })),
             desglose: {
                 subtotal: parseFloat(subtotal.toFixed(2)),
-                totalPagar: parseFloat(subtotal.toFixed(2)) // Aquí sumarías envíos manuales luego
+                envio: parseFloat((carrito.costoEnvio || 0).toFixed(2)),
+                totalPagar: parseFloat((subtotal + (carrito.costoEnvio || 0)).toFixed(2))
             },
             instrucciones: "Usa este resumen para realizar el pago off-platform."
         };
@@ -201,5 +194,5 @@ module.exports = {
     agregarAlCarrito, 
     eliminarDelCarrito, 
     confirmarCotizacion,
-    generarTicket // <-- Nueva función añadida
+    generarTicket
 };
