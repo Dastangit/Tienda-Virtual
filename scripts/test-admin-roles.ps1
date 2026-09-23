@@ -8,7 +8,7 @@
 #
 #  La primera vez que lo corras, el script te va a avisar que
 #  vayas a MongoDB Atlas a cambiar el "role" del admin a "admin".
-#  Las siguientes veces, si usas el mismo correo de admin, el
+#  Las siguientes veces, si usas el mismo telefono de admin, el
 #  script simplemente inicia sesion con el.
 # ==========================================================
 
@@ -18,17 +18,17 @@ function Write-Seccion($texto) {
     Write-Host "`n=== $texto ===" -ForegroundColor Cyan
 }
 
-# --- 1. Registrar un cliente normal (correo nuevo en cada corrida) ---
+# --- 1. Registrar un cliente normal (telefono nuevo en cada corrida) ---
 Write-Seccion "1. Registrando cliente"
-$emailCliente = "cliente_$(Get-Random)@test.com"
+$phoneCliente = "+1809555$(Get-Random -Minimum 1000 -Maximum 9999)"
 $cliente = Invoke-RestMethod -Uri "$baseUrl/api/users/register" -Method Post -ContentType "application/json" -Body (@{
     name     = "Cliente Prueba"
-    email    = $emailCliente
+    phone    = $phoneCliente
     password = "123456"
 } | ConvertTo-Json)
 $tokenCliente = $cliente.token
 $headersCliente = @{ Authorization = "Bearer $tokenCliente" }
-Write-Host "Cliente creado: $emailCliente"
+Write-Host "Cliente creado: $phoneCliente"
 
 # --- 2. Agregar un producto al carrito ---
 # Primero lo buscamos/cacheamos con /api/search (ahi se fija el precio real),
@@ -54,13 +54,13 @@ Write-Host "Carrito del cliente pasado a 'cotizando'"
 
 # --- 4. Registrar (o reutilizar) un admin ---
 Write-Seccion "4. Preparando usuario admin"
-$emailAdmin = "admin@test.com"   # usa siempre el mismo correo para no depender de Atlas cada vez
+$phoneAdmin = "+18095550000"   # usa siempre el mismo numero para no depender de Atlas cada vez
 $passwordAdmin = "123456"
 
 try {
     $admin = Invoke-RestMethod -Uri "$baseUrl/api/users/register" -Method Post -ContentType "application/json" -Body (@{
         name     = "Admin Prueba"
-        email    = $emailAdmin
+        phone    = $phoneAdmin
         password = $passwordAdmin
     } | ConvertTo-Json)
     Write-Host "Admin registrado por primera vez. Ve a MongoDB Atlas y cambia su 'role' a 'admin' antes de continuar, luego vuelve a correr el script." -ForegroundColor Yellow
@@ -68,7 +68,7 @@ try {
 } catch {
     # Si ya existia, iniciamos sesion normalmente
     $admin = Invoke-RestMethod -Uri "$baseUrl/api/users/login" -Method Post -ContentType "application/json" -Body (@{
-        email    = $emailAdmin
+        phone    = $phoneAdmin
         password = $passwordAdmin
     } | ConvertTo-Json)
 }

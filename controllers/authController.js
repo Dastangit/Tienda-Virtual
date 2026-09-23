@@ -10,21 +10,33 @@ const generarToken = (id) => {
     });
 };
 
+// Normaliza el numero: solo digitos y un '+' inicial opcional (ej: "+1 809-555-1234" -> "+18095551234")
+const normalizarTelefono = (phone) => {
+    if (!phone) return phone;
+    const limpio = phone.trim().replace(/[^\d+]/g, '');
+    return limpio;
+};
+
 // 1. REGISTRAR NUEVO USUARIO
 const registrarUsuario = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, password } = req.body;
+        const phone = normalizarTelefono(req.body.phone);
 
-        // Verificamos si el correo ya existe en la base de datos
-        const usuarioExiste = await User.findOne({ email });
+        if (!phone || phone.replace('+', '').length < 8) {
+            return res.status(400).json({ error: 'Ingresa un número de teléfono válido (con código de país, ej: +18095551234)' });
+        }
+
+        // Verificamos si el número ya existe en la base de datos
+        const usuarioExiste = await User.findOne({ phone });
         if (usuarioExiste) {
-            return res.status(400).json({ error: 'Este correo ya está registrado' });
+            return res.status(400).json({ error: 'Este número ya está registrado' });
         }
 
         // Creamos al usuario (la contraseña se encripta automáticamente por la regla en User.js)
         const user = await User.create({
             name,
-            email,
+            phone,
             password
         });
 
@@ -32,7 +44,7 @@ const registrarUsuario = async (req, res) => {
             res.status(201).json({
                 _id: user.id,
                 name: user.name,
-                email: user.email,
+                phone: user.phone,
                 token: generarToken(user._id)
             });
         }
@@ -45,21 +57,22 @@ const registrarUsuario = async (req, res) => {
 // 2. INICIAR SESIÓN (LOGIN)
 const loginUsuario = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const phone = normalizarTelefono(req.body.phone);
+        const { password } = req.body;
 
-        // Buscamos al usuario por su correo
-        const user = await User.findOne({ email });
+        // Buscamos al usuario por su número
+        const user = await User.findOne({ phone });
 
         // Si el usuario existe y la contraseña encriptada coincide
         if (user && (await bcrypt.compare(password, user.password))) {
             res.json({
                 _id: user.id,
                 name: user.name,
-                email: user.email,
+                phone: user.phone,
                 token: generarToken(user._id)
             });
         } else {
-            res.status(401).json({ error: 'Credenciales inválidas (correo o contraseña incorrectos)' });
+            res.status(401).json({ error: 'Credenciales inválidas (teléfono o contraseña incorrectos)' });
         }
     } catch (error) {
         console.error('❌ Error en el login:', error.message);

@@ -6,10 +6,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    email: {
+    phone: {
         type: String,
         required: true,
-        unique: true // Evita correos duplicados en la base de datos
+        unique: true // Evita numeros duplicados en la base de datos
     },
     password: {
         type: String,

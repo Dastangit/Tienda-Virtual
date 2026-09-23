@@ -102,7 +102,7 @@ $('#loginForm').addEventListener('submit', async (e) => {
   try {
     const data = await api('/api/users/login', {
       method: 'POST',
-      body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') })
+      body: JSON.stringify({ phone: fd.get('phone'), password: fd.get('password') })
     });
     setToken(data.token);
     onLoggedIn();
@@ -118,7 +118,7 @@ $('#registerForm').addEventListener('submit', async (e) => {
   try {
     const data = await api('/api/users/register', {
       method: 'POST',
-      body: JSON.stringify({ name: fd.get('name'), email: fd.get('email'), password: fd.get('password') })
+      body: JSON.stringify({ name: fd.get('name'), phone: fd.get('phone'), password: fd.get('password') })
     });
     setToken(data.token);
     onLoggedIn();

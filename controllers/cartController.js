@@ -109,7 +109,7 @@ const notificarNuevaCotizacion = async (carrito, cliente) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 carritoId: carrito._id.toString(),
-                cliente: cliente.email,
+                cliente: cliente.phone,
                 fuente: carrito.items[0].source.toUpperCase(),
                 cantidadProductos: carrito.items.length,
                 subtotal: parseFloat(subtotal.toFixed(2)),

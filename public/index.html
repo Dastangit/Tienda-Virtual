@@ -43,7 +43,7 @@
         </div>
 
         <form id="loginForm" class="auth-form">
-          <label>Correo<input type="email" name="email" required autocomplete="email"></label>
+          <label>Teléfono<input type="tel" name="phone" placeholder="+18095551234" required autocomplete="tel"></label>
           <label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label>
           <button type="submit" class="btn btn-primary">Entrar</button>
           <p class="form-error" data-error-for="loginForm"></p>
@@ -51,7 +51,7 @@
 
         <form id="registerForm" class="auth-form" hidden>
           <label>Nombre<input type="text" name="name" required autocomplete="name"></label>
-          <label>Correo<input type="email" name="email" required autocomplete="email"></label>
+          <label>Teléfono<input type="tel" name="phone" placeholder="+18095551234" required autocomplete="tel"></label>
           <label>Contraseña<input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
           <button type="submit" class="btn btn-primary">Crear cuenta</button>
           <p class="form-error" data-error-for="registerForm"></p>
