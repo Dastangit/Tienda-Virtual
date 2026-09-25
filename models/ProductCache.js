@@ -25,5 +25,10 @@ const productCacheSchema = new mongoose.Schema({
     }
 });
 
+// Evita duplicados si dos búsquedas del mismo producto llegan casi a la vez
+// (sin esto, agregarAlCarrito podría tomar por findOne un documento viejo
+// mientras existe otro más reciente para el mismo originalId+source).
+productCacheSchema.index({ originalId: 1, source: 1 }, { unique: true });
+
 // Exportamos el modelo para que el controlador lo pueda usar
 module.exports = mongoose.model('ProductCache', productCacheSchema);

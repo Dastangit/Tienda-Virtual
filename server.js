@@ -1,8 +1,15 @@
 // Importamos las herramientas que instalamos
+const dns = require('dns');
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
+
+// En Windows (y a veces detrás de VPN), el fetch nativo de Node puede fallar
+// de forma intermitente ("fetch failed") por cómo resuelve IPv6 vs IPv4.
+// Forzamos IPv4 primero para evitar esos cuelgues esporadicos en llamadas
+// salientes (Scrapingdog, Apify, Make).
+dns.setDefaultResultOrder('ipv4first');
 
 // Importamos nuestra propia función de conexión a la base de datos
 const connectDB = require('./config/db');

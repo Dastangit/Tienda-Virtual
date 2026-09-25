@@ -3,6 +3,45 @@ const { calcularPrecioFinal } = require('../utils/pricing');
 
 // --- CONEXIÓN CON APIs EXTERNAS REALES ---
 
+// fetch nativo de Node a veces falla con "fetch failed" por un hipo de red
+// transitorio (común en Windows / detrás de VPN), sin que la API externa
+// tenga la culpa. Un reintento simple resuelve la gran mayoría de estos casos.
+const fetchConReintento = async (url, options, intentos = 2) => {
+    for (let intento = 1; intento <= intentos; intento++) {
+        try {
+            return await fetch(url, options);
+        } catch (error) {
+            const esUltimoIntento = intento === intentos;
+            console.error(`⚠️ fetch falló (intento ${intento}/${intentos}): ${error.message}`);
+            if (esUltimoIntento) throw error;
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+    }
+};
+
+// Scrapingdog a veces manda el precio como texto con ruido alrededor,
+// ej: "$17.99 with 49 percent savings". Un regex que solo quita letras
+// arrastra los dígitos de "49" y arma un número incorrecto (17.9949).
+// Por eso: 1) preferimos el precio ya parseado por Scrapingdog si existe,
+// 2) si no, tomamos SOLO el primer número con forma de precio (x.xx).
+const extraerPrecioAmazon = (data) => {
+    const extraidoLimpio = data?.purchase_options?.single_offer?.extracted_price;
+    if (typeof extraidoLimpio === 'number' && !Number.isNaN(extraidoLimpio)) {
+        return extraidoLimpio;
+    }
+    if (typeof data.price === 'number') {
+        return data.price;
+    }
+    const match = String(data.price || '').match(/[\d,]+\.\d{2}/);
+    return match ? parseFloat(match[0].replace(/,/g, '')) : NaN;
+};
+
+const extraerPrecioTexto = (precioBruto) => {
+    if (typeof precioBruto === 'number') return precioBruto;
+    const match = String(precioBruto || '').match(/[\d,]+\.\d{2}/);
+    return match ? parseFloat(match[0].replace(/,/g, '')) : NaN;
+};
+
 // 1. Amazon vía Scrapingdog (Amazon Product Scraper API)
 //    originalId debe ser el ASIN real del producto (ej: B08N5WRWNW)
 const obtenerProductoAmazon = async (asin) => {
@@ -12,7 +51,7 @@ const obtenerProductoAmazon = async (asin) => {
         asin
     });
 
-    const response = await fetch(`https://api.scrapingdog.com/amazon/product?${params.toString()}`);
+    const response = await fetchConReintento(`https://api.scrapingdog.com/amazon/product?${params.toString()}`);
 
     if (!response.ok) {
         throw new Error(`Scrapingdog respondió ${response.status}`);
@@ -20,9 +59,7 @@ const obtenerProductoAmazon = async (asin) => {
 
     const data = await response.json();
 
-    const precioNumerico = typeof data.price === 'number'
-        ? data.price
-        : parseFloat(String(data.price).replace(/[^0-9.]/g, ''));
+    const precioNumerico = extraerPrecioAmazon(data);
 
     return {
         originalId: asin,
@@ -39,7 +76,7 @@ const obtenerProductoAmazon = async (asin) => {
 const obtenerProductoShein = async (productUrl) => {
     const url = `https://api.apify.com/v2/acts/shahidirfan~shein-product-scraper/run-sync-get-dataset-items?token=${process.env.APIFY_API_TOKEN}`;
 
-    const response = await fetch(url, {
+    const response = await fetchConReintento(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,7 +116,7 @@ const buscarPorTextoAmazon = async (query) => {
         page: '1'
     });
 
-    const response = await fetch(`https://api.scrapingdog.com/amazon/search?${params.toString()}`);
+    const response = await fetchConReintento(`https://api.scrapingdog.com/amazon/search?${params.toString()}`);
     if (!response.ok) {
         throw new Error(`Scrapingdog respondió ${response.status}`);
     }
@@ -93,7 +130,7 @@ const buscarPorTextoAmazon = async (query) => {
             originalId: item.asin,
             source: 'amazon',
             title: item.title,
-            price: item.extracted_price ?? parseFloat(String(item.price).replace(/[^0-9.]/g, '')),
+            price: item.extracted_price ?? extraerPrecioTexto(item.price),
             image: item.image
         }));
 };
@@ -103,7 +140,7 @@ const buscarPorTextoShein = async (query) => {
     const searchUrl = `https://us.shein.com/pdsearch/${encodeURIComponent(query)}/`;
     const url = `https://api.apify.com/v2/acts/shahidirfan~shein-product-scraper/run-sync-get-dataset-items?token=${process.env.APIFY_API_TOKEN}`;
 
-    const response = await fetch(url, {
+    const response = await fetchConReintento(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -163,7 +200,16 @@ const searchProduct = async (req, res) => {
         }
 
         producto = new ProductCache(externalApiData);
-        await producto.save();
+        try {
+            await producto.save();
+        } catch (error) {
+            if (error.code === 11000) {
+                // Dos búsquedas casi simultáneas del mismo producto: la otra ya ganó la carrera
+                producto = await ProductCache.findOne({ originalId, source });
+            } else {
+                throw error;
+            }
+        }
 
         const productoResponse = producto.toObject();
         productoResponse.precioFinalCliente = calcularPrecioFinal(producto.price);

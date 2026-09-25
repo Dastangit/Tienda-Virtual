@@ -122,6 +122,24 @@
 
   </main>
 
+  <!-- ===== PRODUCT MODAL (galeria de fotos) ===== -->
+  <div id="productModal" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button type="button" class="modal-close" id="modalCloseBtn" aria-label="Cerrar">✕</button>
+      <div id="modalLoading" class="modal-loading">Cargando fotos…</div>
+      <div id="modalBody" hidden>
+        <div id="modalGallery" class="modal-gallery"></div>
+        <div class="modal-info">
+          <p class="result-source" id="modalSource"></p>
+          <h3 id="modalTitle"></h3>
+          <span class="modal-price" id="modalPrice"></span>
+          <button id="modalAddBtn" class="btn btn-stamp btn-block">Agregar al carrito</button>
+          <p class="form-error" id="modalError"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" hidden></div>
 
   <script src="/js/app.js"></script>

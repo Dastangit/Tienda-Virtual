@@ -147,6 +147,27 @@ const confirmarCotizacion = async (req, res) => {
 };
 
 // 5. GENERAR TICKET DE COMPRA (Checkout)
+// Convierte un carrito de Mongo en el JSON de recibo que dibuja el frontend.
+const formatearOrden = (carrito) => {
+    const subtotal = carrito.items.reduce((acc, item) => acc + item.precioFinalCliente, 0);
+    return {
+        numeroOrden: carrito._id,
+        fecha: carrito.updatedAt,
+        estado: carrito.status, // 'cotizando' (esperando envio) | 'pagado' | 'completado'
+        tiendaOrigen: carrito.items[0]?.source?.toUpperCase() || '',
+        productos: carrito.items.map(item => ({
+            titulo: item.title,
+            precio: item.precioFinalCliente,
+            imagen: item.image || ''
+        })),
+        desglose: {
+            subtotal: parseFloat(subtotal.toFixed(2)),
+            envio: parseFloat((carrito.costoEnvio || 0).toFixed(2)),
+            totalPagar: parseFloat((subtotal + (carrito.costoEnvio || 0)).toFixed(2))
+        }
+    };
+};
+
 const generarTicket = async (req, res) => {
     try {
         // Buscamos un carrito que ya haya solicitado cotización
@@ -159,30 +180,27 @@ const generarTicket = async (req, res) => {
             return res.status(404).json({ error: 'No tienes órdenes en proceso de cotización.' });
         }
 
-        const fuente = carrito.items[0].source.toUpperCase();
-        const subtotal = carrito.items.reduce((acc, item) => acc + item.precioFinalCliente, 0);
-
-        const ticket = {
-            numeroOrden: carrito._id,
-            fecha: carrito.updatedAt,
-            estado: carrito.status, // 'cotizando' (esperando envío) o 'pagado' (envío ya asignado)
-            tiendaOrigen: fuente,
-            productos: carrito.items.map(item => ({
-                titulo: item.title,
-                precio: item.precioFinalCliente
-            })),
-            desglose: {
-                subtotal: parseFloat(subtotal.toFixed(2)),
-                envio: parseFloat((carrito.costoEnvio || 0).toFixed(2)),
-                totalPagar: parseFloat((subtotal + (carrito.costoEnvio || 0)).toFixed(2))
-            },
-            instrucciones: "Usa este resumen para realizar el pago off-platform."
-        };
+        const ticket = formatearOrden(carrito);
+        ticket.instrucciones = "Usa este resumen para realizar el pago off-platform.";
 
         res.json({ ticket });
     } catch (error) {
         console.error('❌ Error al generar el ticket:', error.message);
         res.status(500).json({ error: 'Error interno al generar el ticket' });
+    }
+};
+
+// 6. HISTORIAL COMPLETO DE COTIZACIONES DEL CLIENTE ("Mis cotizaciones")
+const obtenerHistorial = async (req, res) => {
+    try {
+        const carritos = await Cart.find({ user: req.user._id, status: { $ne: 'activo' } })
+            .sort({ updatedAt: -1 });
+
+        const historial = carritos.map(formatearOrden);
+        res.json({ historial });
+    } catch (error) {
+        console.error('❌ Error al obtener historial:', error.message);
+        res.status(500).json({ error: 'Error interno al obtener el historial' });
     }
 };
 
@@ -194,5 +212,6 @@ module.exports = {
     agregarAlCarrito, 
     eliminarDelCarrito, 
     confirmarCotizacion,
-    generarTicket
+    generarTicket,
+    obtenerHistorial
 };

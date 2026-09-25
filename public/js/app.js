@@ -3,10 +3,12 @@
 // ============================================
 const API = '';
 const TOKEN_KEY = 'tv_token';
+const MAX_MODAL_PHOTOS = 5;
 
 const state = {
   token: localStorage.getItem(TOKEN_KEY) || null,
   source: 'amazon',
+  modalItem: null, // { originalId, source } del producto que esta abierto en el modal
 };
 
 // ---------- helpers ----------
@@ -183,52 +185,99 @@ function renderSearchResults(resultados) {
   }
 
   count.hidden = false;
-  count.textContent = `${resultados.length} resultados`;
+  count.textContent = `${resultados.length} resultados — toca uno para ver más fotos`;
 
   resultados.forEach(item => {
-    const card = document.createElement('div');
+    const card = document.createElement('button');
+    card.type = 'button';
     card.className = 'result-item';
     card.innerHTML = `
       <img src="${item.image || ''}" alt="" loading="lazy">
       <div class="result-item-body">
         <p class="result-item-title">${escapeHtml(item.title)}</p>
         <span class="result-item-price">${money(item.precioFinalCliente)}</span>
-        <button class="btn btn-stamp btn-sm add-result-btn">Agregar</button>
-        <p class="form-error"></p>
       </div>
     `;
-    const btn = card.querySelector('.add-result-btn');
-    const errEl = card.querySelector('.form-error');
-    btn.addEventListener('click', () => addResultToCart(item, btn, errEl));
+    card.addEventListener('click', () => openProductModal(item));
     grid.appendChild(card);
   });
 
   grid.hidden = false;
 }
 
-async function addResultToCart(item, btn, errEl) {
-  errEl.textContent = '';
+// ---------- product modal (galeria de hasta 5 fotos) ----------
+async function openProductModal(item) {
+  state.modalItem = { originalId: item.originalId, source: item.source };
+
+  $('#productModal').hidden = false;
+  $('#modalLoading').hidden = false;
+  $('#modalBody').hidden = true;
+  $('#modalError').textContent = '';
+  document.body.style.overflow = 'hidden';
+
+  try {
+    // Mismo endpoint que usa "agregar al carrito": trae el detalle completo
+    // (incluye TODAS las fotos) y ya deja el producto cacheado con precio actualizado.
+    const data = await api('/api/search', {
+      method: 'POST',
+      body: JSON.stringify(state.modalItem)
+    });
+    const p = data.data;
+    const fotos = (p.images || []).slice(0, MAX_MODAL_PHOTOS);
+
+    $('#modalGallery').innerHTML = (fotos.length ? fotos : [item.image || ''])
+      .map(src => `<img src="${src}" alt="" loading="lazy">`)
+      .join('');
+    $('#modalSource').textContent = p.source.toUpperCase();
+    $('#modalTitle').textContent = p.title;
+    $('#modalPrice').textContent = money(p.precioFinalCliente);
+
+    $('#modalLoading').hidden = true;
+    $('#modalBody').hidden = false;
+  } catch (err) {
+    $('#modalLoading').hidden = true;
+    $('#modalBody').hidden = false;
+    $('#modalGallery').innerHTML = '';
+    $('#modalError').textContent = err.message;
+  }
+}
+
+function closeProductModal() {
+  $('#productModal').hidden = true;
+  document.body.style.overflow = '';
+  state.modalItem = null;
+}
+
+$('#modalCloseBtn').addEventListener('click', closeProductModal);
+$('#productModal').addEventListener('click', (e) => {
+  if (e.target.id === 'productModal') closeProductModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#productModal').hidden) closeProductModal();
+});
+
+$('#modalAddBtn').addEventListener('click', async () => {
+  if (!state.modalItem) return;
+  const btn = $('#modalAddBtn');
+  $('#modalError').textContent = '';
   btn.disabled = true;
   btn.textContent = 'Agregando…';
   try {
-    // Recotizamos por ID exacto: confirma stock/precio actual y lo cachea antes de agregarlo.
-    await api('/api/search', {
-      method: 'POST',
-      body: JSON.stringify({ originalId: item.originalId, source: item.source })
-    });
+    // El producto ya quedo cacheado al abrir el modal (llamada a /api/search arriba)
     await api('/api/carrito', {
       method: 'POST',
-      body: JSON.stringify({ originalId: item.originalId, source: item.source })
+      body: JSON.stringify(state.modalItem)
     });
     toast('Agregado al carrito');
     refreshCartCount();
-    btn.textContent = 'Agregado ✓';
+    closeProductModal();
   } catch (err) {
-    errEl.textContent = err.message;
+    $('#modalError').textContent = err.message;
+  } finally {
     btn.disabled = false;
-    btn.textContent = 'Agregar';
+    btn.textContent = 'Agregar al carrito';
   }
-}
+});
 
 // ---------- cart ----------
 async function refreshCartCount() {
@@ -309,7 +358,7 @@ $('#confirmCartBtn').addEventListener('click', async () => {
   }
 });
 
-// ---------- orders (ticket de la cotización en curso) ----------
+// ---------- orders (historial completo de cotizaciones) ----------
 async function renderOrders() {
   const empty = $('#ordersEmpty');
   const content = $('#ordersContent');
@@ -317,36 +366,49 @@ async function renderOrders() {
 
   let data;
   try {
-    data = await api('/api/carrito/ticket');
+    data = await api('/api/carrito/historial');
   } catch (err) {
     empty.hidden = false;
-    empty.querySelector('p').textContent = err.message.includes('No tienes')
-      ? 'Todavía no tienes cotizaciones confirmadas.'
-      : err.message;
+    empty.querySelector('p').textContent = err.message;
+    return;
+  }
+
+  const historial = data.historial || [];
+  if (historial.length === 0) {
+    empty.hidden = false;
+    empty.querySelector('p').textContent = 'Todavía no tienes cotizaciones confirmadas.';
     return;
   }
   empty.hidden = true;
 
-  const t = data.ticket;
-  const statusClass = t.estado === 'pagado' ? 'is-pagado' : 'is-cotizando';
-  const statusLabel = t.estado === 'pagado' ? 'Envío asignado' : 'Cotizando envío';
+  content.innerHTML = historial.map(t => {
+    const statusClass = t.estado === 'cotizando' ? 'is-cotizando' : 'is-pagado';
+    const statusLabel = t.estado === 'cotizando' ? 'Cotizando envío' : (t.estado === 'completado' ? 'Completado' : 'Envío asignado');
+    const fecha = new Date(t.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  const productos = t.productos.map(p => `${p.titulo} — ${money(p.precio)}`).join('<br>');
+    const productosHtml = t.productos.map(p => `
+      <div class="order-product">
+        <img src="${p.imagen || ''}" alt="" loading="lazy">
+        <span class="order-product-title">${escapeHtml(p.titulo)}</span>
+        <span class="order-product-price">${money(p.precio)}</span>
+      </div>
+    `).join('');
 
-  content.innerHTML = `
-    <div class="order-card">
-      <div class="order-head">
-        <span class="order-id">#${t.numeroOrden}</span>
-        <span class="order-status ${statusClass}">${statusLabel}</span>
+    return `
+      <div class="order-card">
+        <div class="order-head">
+          <span class="order-id">#${String(t.numeroOrden).slice(-6)} · ${fecha}</span>
+          <span class="order-status ${statusClass}">${statusLabel}</span>
+        </div>
+        <div class="order-products">${productosHtml}</div>
+        <div class="order-head" style="margin-bottom:0">
+          <span>Tienda: ${t.tiendaOrigen}</span>
+          <span class="order-total">${money(t.desglose.totalPagar)}</span>
+        </div>
+        ${t.estado !== 'cotizando' ? `<p class="manifest-item-price" style="margin-top:8px">Subtotal ${money(t.desglose.subtotal)} + envío ${money(t.desglose.envio)}</p>` : ''}
       </div>
-      <p class="order-items">${productos}</p>
-      <div class="order-head" style="margin-bottom:0">
-        <span>Tienda: ${t.tiendaOrigen}</span>
-        <span class="order-total">${money(t.desglose.totalPagar)}</span>
-      </div>
-      ${t.estado === 'pagado' ? `<p class="manifest-item-price" style="margin-top:8px">Subtotal ${money(t.desglose.subtotal)} + envío ${money(t.desglose.envio)}</p>` : ''}
-    </div>
-  `;
+    `;
+  }).join('');
 }
 
 // ---------- boot ----------
