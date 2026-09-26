@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Panel Admin — Tienda Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css" />
+<link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+
+  <div class="airmail-bar" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Tienda Virtual · Admin</span>
+      </div>
+      <nav class="nav" id="appNav" hidden>
+        <a class="nav-link" href="/">Ver tienda ↗</a>
+        <span class="nav-link" id="adminNameLabel"></span>
+        <button class="nav-link nav-exit" id="logoutBtn">Salir</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- ===== AUTH ===== -->
+    <section id="view-auth" class="view">
+      <div class="auth-card">
+        <p class="eyebrow">Acceso restringido</p>
+        <h1>Panel de<br>administrador</h1>
+        <p class="lede">Solo cuentas con rol de administrador pueden entrar aquí. El rol se asigna manualmente en la base de datos.</p>
+
+        <form id="loginForm" class="auth-form">
+          <label>Teléfono<input type="tel" name="phone" placeholder="+18095551234" required autocomplete="tel"></label>
+          <label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label>
+          <button type="submit" class="btn btn-primary">Entrar</button>
+          <p class="form-error" data-error-for="loginForm"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== DASHBOARD ===== -->
+    <section id="view-dashboard" class="view" hidden>
+      <div class="admin-head">
+        <div>
+          <p class="eyebrow">Panel de pedidos</p>
+          <h1 id="dashboardTitle">Cotizaciones pendientes</h1>
+        </div>
+        <button id="refreshBtn" type="button" class="btn btn-sm btn-ghost">Refrescar</button>
+      </div>
+
+      <div class="source-toggle admin-tabs" role="radiogroup" aria-label="Estado">
+        <button type="button" class="source-btn is-active" data-status="cotizando">Cotizando</button>
+        <button type="button" class="source-btn" data-status="pagado">Pagados</button>
+        <button type="button" class="source-btn" data-status="completado">Completados</button>
+      </div>
+
+      <div id="quotesEmpty" class="empty-state" hidden>
+        <p>No hay pedidos en este estado por ahora.</p>
+      </div>
+
+      <div id="quotesList" class="quotes-list"></div>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

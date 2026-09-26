@@ -5,3 +5,4 @@ node_modules/
 scripts/*.log
 scripts/*.pid
 scripts/*_test_response*.json
+scripts/*_sample*.json

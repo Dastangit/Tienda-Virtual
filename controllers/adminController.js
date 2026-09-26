@@ -1,10 +1,18 @@
 const Cart = require('../models/Cart');
 
-// 1. LISTAR CARRITOS PENDIENTES DE ENVÍO (estado "cotizando")
+// 1. LISTAR CARRITOS POR ESTADO (por defecto "cotizando", pero admite ?status=pagado|completado)
 const obtenerCotizaciones = async (req, res) => {
     try {
-        const carritos = await Cart.find({ status: 'cotizando' })
-            .populate('user', 'name email'); // Traemos nombre y correo del cliente, sin la contraseña
+        const status = req.query.status || 'cotizando';
+        const estadosValidos = ['cotizando', 'pagado', 'completado'];
+
+        if (!estadosValidos.includes(status)) {
+            return res.status(400).json({ error: `Estado inválido. Usa uno de: ${estadosValidos.join(', ')}` });
+        }
+
+        const carritos = await Cart.find({ status })
+            .populate('user', 'name phone') // Traemos nombre y teléfono del cliente, sin la contraseña
+            .sort({ updatedAt: -1 });
 
         res.json(carritos);
     } catch (error) {
@@ -49,4 +57,33 @@ const asignarCostoEnvio = async (req, res) => {
     }
 };
 
-module.exports = { obtenerCotizaciones, asignarCostoEnvio };
+// 3. MARCAR UN CARRITO PAGADO COMO COMPLETADO (entregado)
+const marcarCompletado = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const carrito = await Cart.findById(id);
+
+        if (!carrito) {
+            return res.status(404).json({ error: 'Carrito no encontrado' });
+        }
+
+        if (carrito.status !== 'pagado') {
+            return res.status(400).json({
+                error: `Este carrito está en estado "${carrito.status}". Solo se puede completar un carrito en "pagado".`
+            });
+        }
+
+        carrito.status = 'completado';
+        await carrito.save();
+
+        res.json({
+            mensaje: '✅ Pedido marcado como completado.',
+            carrito
+        });
+    } catch (error) {
+        console.error('❌ Error al marcar como completado:', error.message);
+        res.status(500).json({ error: 'Error interno al completar el pedido' });
+    }
+};
+
+module.exports = { obtenerCotizaciones, asignarCostoEnvio, marcarCompletado };

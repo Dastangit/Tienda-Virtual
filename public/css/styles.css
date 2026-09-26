@@ -444,6 +444,7 @@ input:focus, .source-btn:focus-visible, .nav-link:focus-visible, .btn:focus-visi
 }
 .order-status.is-cotizando { background: var(--amber-bg); color: var(--amber); }
 .order-status.is-pagado { background: var(--green-bg); color: var(--green); }
+.order-status.is-completado { background: rgba(34, 211, 238, 0.12); color: var(--cyan); }
 .order-products { margin: 0 0 10px; }
 .order-product {
   display: flex;

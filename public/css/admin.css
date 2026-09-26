@@ -1,0 +1,57 @@
+/* ============================================
+   Tienda Virtual — admin.css (panel de administrador)
+   Reutiliza las variables y componentes de styles.css
+   ============================================ */
+
+.admin-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.btn-ghost {
+  background: var(--bg-elevated);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--border-strong); }
+
+.quotes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.quote-card {
+  padding: 16px 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.quote-customer {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  margin: 0 0 10px;
+}
+
+.quote-assign-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.quote-assign-form input {
+  flex: 1;
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 560px) {
+  .quote-assign-form { flex-direction: column; }
+  .quote-assign-form .btn { width: 100%; }
+  .admin-head { flex-direction: column; align-items: flex-start; }
+}

@@ -71,38 +71,28 @@ const obtenerProductoAmazon = async (asin) => {
     };
 };
 
-// 2. Shein vía Apify (actor: shahidirfan/shein-product-scraper)
-//    originalId debe ser la URL completa del producto en Shein
+// 2. Shein vía Omkar Cloud (API dedicada a Shein, con lookup exacto por producto)
+//    originalId debe ser la URL completa del producto en Shein (o su goods_id numérico)
 const obtenerProductoShein = async (productUrl) => {
-    const url = `https://api.apify.com/v2/acts/shahidirfan~shein-product-scraper/run-sync-get-dataset-items?token=${process.env.APIFY_API_TOKEN}`;
+    const params = new URLSearchParams({ product: productUrl });
 
-    const response = await fetchConReintento(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            startUrl: productUrl,
-            results_wanted: 1
-        })
+    const response = await fetchConReintento(`https://shein-scraper.omkar.cloud/shein/products/details?${params.toString()}`, {
+        headers: { 'API-Key': process.env.OMKAR_SHEIN_API_KEY }
     });
 
     if (!response.ok) {
-        throw new Error(`Apify respondió ${response.status}`);
+        throw new Error(`Omkar Cloud (Shein) respondió ${response.status}`);
     }
 
-    const items = await response.json();
-    const producto = items[0];
-
-    if (!producto) {
-        throw new Error('Shein no devolvió ningún producto para esa URL');
-    }
+    const data = await response.json();
 
     return {
         originalId: productUrl,
         source: 'shein',
-        title: producto.title,
-        price: producto.sale_price,
+        title: data.name,
+        price: data.pricing?.sale_price?.amount,
         currency: 'USD',
-        images: [producto.image_url, ...(producto.detail_image || [])].filter(Boolean)
+        images: data.images || []
     };
 };
 
@@ -135,32 +125,28 @@ const buscarPorTextoAmazon = async (query) => {
         }));
 };
 
-// 4. Búsqueda por PALABRA CLAVE en Shein (mismo actor de Apify, con URL de búsqueda)
+// 4. Búsqueda por PALABRA CLAVE en Shein (Omkar Cloud, mismo proveedor que el detalle)
 const buscarPorTextoShein = async (query) => {
-    const searchUrl = `https://us.shein.com/pdsearch/${encodeURIComponent(query)}/`;
-    const url = `https://api.apify.com/v2/acts/shahidirfan~shein-product-scraper/run-sync-get-dataset-items?token=${process.env.APIFY_API_TOKEN}`;
+    const params = new URLSearchParams({ query, country: 'US' });
 
-    const response = await fetchConReintento(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            startUrl: searchUrl,
-            results_wanted: 12
-        })
+    const response = await fetchConReintento(`https://shein-scraper.omkar.cloud/shein/search/products?${params.toString()}`, {
+        headers: { 'API-Key': process.env.OMKAR_SHEIN_API_KEY }
     });
     if (!response.ok) {
-        throw new Error(`Apify respondió ${response.status}`);
+        throw new Error(`Omkar Cloud (Shein) respondió ${response.status}`);
     }
-    const items = await response.json();
+    const data = await response.json();
+    const items = data.results || [];
 
     return items
-        .filter(item => item.url && item.sale_price)
+        .filter(item => item.link && item.pricing?.sale_price?.amount)
+        .slice(0, 12)
         .map(item => ({
-            originalId: item.url,
+            originalId: item.link,
             source: 'shein',
-            title: item.title,
-            price: item.sale_price,
-            image: item.image_url
+            title: item.name,
+            price: item.pricing.sale_price.amount,
+            image: item.image
         }));
 };
 // ------------------------------------
