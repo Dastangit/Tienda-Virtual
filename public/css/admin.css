@@ -50,6 +50,19 @@
   font-family: var(--font-mono);
 }
 
+.price-check-result {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.price-check-line { margin: 0; font-size: 0.85rem; font-family: var(--font-mono); }
+.price-check-line.is-ok { color: var(--green); }
+.price-check-line.is-changed { color: var(--amber); }
+.price-check-line.is-error { color: var(--danger); }
+
 @media (max-width: 560px) {
   .quote-assign-form { flex-direction: column; }
   .quote-assign-form .btn { width: 100%; }

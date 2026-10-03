@@ -1,4 +1,6 @@
 const Cart = require('../models/Cart');
+const { obtenerProductoAmazon, obtenerProductoShein } = require('./searchController');
+const { calcularPrecioFinal } = require('../utils/pricing');
 
 // 1. LISTAR CARRITOS POR ESTADO (por defecto "cotizando", pero admite ?status=pagado|completado)
 const obtenerCotizaciones = async (req, res) => {
@@ -86,4 +88,50 @@ const marcarCompletado = async (req, res) => {
     }
 };
 
-module.exports = { obtenerCotizaciones, asignarCostoEnvio, marcarCompletado };
+// 4. VERIFICAR PRECIOS ACTUALES vs los cotizados (antes de comprar en la tienda real)
+// No modifica el carrito: solo compara. La decision de que hacer si cambio el
+// precio queda en manos del admin.
+const verificarPrecios = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const carrito = await Cart.findById(id);
+
+        if (!carrito) {
+            return res.status(404).json({ error: 'Carrito no encontrado' });
+        }
+
+        const items = await Promise.all(carrito.items.map(async (item) => {
+            try {
+                const actual = item.source === 'amazon'
+                    ? await obtenerProductoAmazon(item.originalId)
+                    : await obtenerProductoShein(item.originalId);
+
+                const precioCotizado = item.precioFinalCliente;
+                const precioActual = calcularPrecioFinal(actual.price);
+                const diferencia = parseFloat((precioActual - precioCotizado).toFixed(2));
+
+                return {
+                    itemId: item._id,
+                    titulo: item.title,
+                    precioCotizado,
+                    precioActual,
+                    diferencia,
+                    cambio: Math.abs(diferencia) >= 0.01
+                };
+            } catch (error) {
+                return {
+                    itemId: item._id,
+                    titulo: item.title,
+                    error: 'No se pudo verificar: ' + error.message
+                };
+            }
+        }));
+
+        res.json({ items });
+    } catch (error) {
+        console.error('❌ Error al verificar precios:', error.message);
+        res.status(500).json({ error: 'Error interno al verificar los precios' });
+    }
+};
+
+module.exports = { obtenerCotizaciones, asignarCostoEnvio, marcarCompletado, verificarPrecios };

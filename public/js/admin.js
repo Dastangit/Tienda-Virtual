@@ -146,6 +146,9 @@ async function loadQuotes() {
   $all('.quote-complete-btn', list).forEach(btn => {
     btn.addEventListener('click', onCompleteClick);
   });
+  $all('.price-check-btn', list).forEach(btn => {
+    btn.addEventListener('click', onPriceCheckClick);
+  });
 }
 
 function renderQuoteCard(carrito) {
@@ -173,8 +176,10 @@ function renderQuoteCard(carrito) {
     accionHtml = `
       <div class="quote-assign-form">
         <span class="manifest-item-price">Envío: ${money(carrito.costoEnvio)} · Total: ${money(subtotal + (carrito.costoEnvio || 0))}</span>
+        <button type="button" class="btn btn-ghost btn-sm price-check-btn">Verificar precios actuales</button>
         <button type="button" class="btn btn-stamp btn-sm quote-complete-btn">Marcar como completado</button>
       </div>
+      <div class="price-check-result" hidden></div>
     `;
   } else {
     accionHtml = `
@@ -241,7 +246,35 @@ async function onCompleteClick(e) {
   }
 }
 
-// ---------- boot ----------
+async function onPriceCheckClick(e) {
+  const card = e.target.closest('.quote-card');
+  const cartId = card.dataset.cartId;
+  const resultEl = $('.price-check-result', card);
+  e.target.disabled = true;
+  e.target.textContent = 'Verificando…';
+  resultEl.hidden = true;
+  try {
+    const data = await api(`/api/admin/carritos/${cartId}/verificar-precios`);
+    resultEl.innerHTML = data.items.map(it => {
+      if (it.error) {
+        return `<p class="price-check-line is-error">${escapeHtml(it.titulo)}: ${escapeHtml(it.error)}</p>`;
+      }
+      if (!it.cambio) {
+        return `<p class="price-check-line is-ok">${escapeHtml(it.titulo)}: sin cambios (${money(it.precioActual)})</p>`;
+      }
+      const signo = it.diferencia > 0 ? '+' : '';
+      return `<p class="price-check-line is-changed">${escapeHtml(it.titulo)}: ${money(it.precioCotizado)} → ${money(it.precioActual)} (${signo}${money(it.diferencia)})</p>`;
+    }).join('');
+    resultEl.hidden = false;
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    e.target.disabled = false;
+    e.target.textContent = 'Verificar precios actuales';
+  }
+}
+
+
 (function boot() {
   if (state.token) {
     onLoggedIn('');

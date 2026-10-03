@@ -261,4 +261,4 @@ const searchByKeyword = async (req, res) => {
     }
 };
 
-module.exports = { searchProduct, searchByKeyword };
+module.exports = { searchProduct, searchByKeyword, obtenerProductoAmazon, obtenerProductoShein };
