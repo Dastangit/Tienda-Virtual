@@ -14,6 +14,16 @@ const productCacheSchema = new mongoose.Schema({
     price: { type: Number },
     currency: { type: String },
     images: [{ type: String }],
+    sizes: [{
+        size: { type: String },
+        inStock: { type: Boolean, default: true }
+    }],
+    colors: [{
+        name: { type: String },
+        link: { type: String },
+        image: { type: String },
+        current: { type: Boolean, default: false }
+    }],
     
     // MAGIA DE MONGODB ATLAS: Índice TTL (Time-To-Live)
     // Esto le dice a la base de datos que borre este documento automáticamente 

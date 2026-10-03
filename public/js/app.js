@@ -238,6 +238,28 @@ function renderModalGallery(fotos) {
   });
 }
 
+function renderModalColors(colors) {
+  const el = $('#modalColors');
+  if (!colors || colors.length === 0) {
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = colors.map(c => `
+    <button type="button" class="color-chip ${c.current ? 'is-active' : ''}" data-link="${escapeHtml(c.link)}" title="${escapeHtml(c.name)}">
+      <img src="${c.image}" alt="${escapeHtml(c.name)}" loading="lazy">
+    </button>
+  `).join('');
+
+  $all('.color-chip', el).forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('is-active')) return;
+      openProductModal({ originalId: btn.dataset.link, source: 'shein' });
+    });
+  });
+}
+
 function renderModalSizes(sizes) {
   const el = $('#modalSizes');
   const addBtn = $('#modalAddBtn');
@@ -269,6 +291,7 @@ function renderModalSizes(sizes) {
 async function openProductModal(item) {
   state.modalItem = { originalId: item.originalId, source: item.source };
   state.modalSize = null;
+  state.modalColorName = null;
 
   $('#productModal').hidden = false;
   $('#modalLoading').hidden = false;
@@ -288,7 +311,9 @@ async function openProductModal(item) {
     const fotos = (p.images || []).slice(0, MAX_MODAL_PHOTOS);
 
     renderModalGallery(fotos.length ? fotos : [item.image || '']);
+    renderModalColors(p.colors);
     renderModalSizes(p.sizes);
+    state.modalColorName = (p.colors || []).find(c => c.current)?.name || null;
     $('#modalSource').textContent = p.source.toUpperCase();
     $('#modalTitle').textContent = p.title;
     $('#modalPrice').textContent = money(p.precioFinalCliente);
@@ -299,6 +324,7 @@ async function openProductModal(item) {
     $('#modalLoading').hidden = true;
     $('#modalBody').hidden = false;
     $('#modalGallery').innerHTML = '';
+    $('#modalColors').hidden = true;
     $('#modalSizes').hidden = true;
     $('#modalError').textContent = err.message;
   }
@@ -309,6 +335,7 @@ function closeProductModal() {
   document.body.style.overflow = '';
   state.modalItem = null;
   state.modalSize = null;
+  state.modalColorName = null;
 }
 
 $('#modalCloseBtn').addEventListener('click', closeProductModal);
@@ -333,7 +360,7 @@ $('#modalAddBtn').addEventListener('click', async () => {
     // El producto ya quedo cacheado al abrir el modal (llamada a /api/search arriba)
     await api('/api/carrito', {
       method: 'POST',
-      body: JSON.stringify({ ...state.modalItem, size: state.modalSize || undefined })
+      body: JSON.stringify({ ...state.modalItem, size: state.modalSize || undefined, color: state.modalColorName || undefined })
     });
     toast('Agregado al carrito');
     refreshCartCount();
@@ -387,7 +414,7 @@ async function renderCart() {
       <img src="${item.image || ''}" alt="">
       <div>
         <p class="manifest-item-title">${escapeHtml(item.title)}</p>
-        <span class="manifest-item-price">${money(item.precioFinalCliente)} · ${item.source.toUpperCase()}${item.size ? ' · Talla ' + escapeHtml(item.size) : ''}</span>
+        <span class="manifest-item-price">${money(item.precioFinalCliente)} · ${item.source.toUpperCase()}${item.size ? ' · Talla ' + escapeHtml(item.size) : ''}${item.color ? ' · ' + escapeHtml(item.color) : ''}</span>
       </div>
       <button class="manifest-item-remove" data-item-id="${item._id}">Quitar</button>
     `;
@@ -456,7 +483,7 @@ async function renderOrders() {
     const productosHtml = t.productos.map(p => `
       <div class="order-product">
         <img src="${p.imagen || ''}" alt="" loading="lazy">
-        <span class="order-product-title">${escapeHtml(p.titulo)}${p.talla ? ' · Talla ' + escapeHtml(p.talla) : ''}</span>
+        <span class="order-product-title">${escapeHtml(p.titulo)}${p.talla ? ' · Talla ' + escapeHtml(p.talla) : ''}${p.color ? ' · ' + escapeHtml(p.color) : ''}</span>
         <span class="order-product-price">${money(p.precio)}</span>
       </div>
     `).join('');
@@ -515,7 +542,7 @@ async function renderAdmin() {
     const productosHtml = c.items.map(it => `
       <div class="order-product">
         <img src="${it.image || ''}" alt="" loading="lazy">
-        <span class="order-product-title">${escapeHtml(it.title)}${it.size ? ' · Talla ' + escapeHtml(it.size) : ''}</span>
+        <span class="order-product-title">${escapeHtml(it.title)}${it.size ? ' · Talla ' + escapeHtml(it.size) : ''}${it.color ? ' · ' + escapeHtml(it.color) : ''}</span>
         <span class="order-product-price">${money(it.precioFinalCliente)}</span>
       </div>
     `).join('');

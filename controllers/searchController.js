@@ -6,14 +6,18 @@ const { calcularPrecioFinal } = require('../utils/pricing');
 // fetch nativo de Node a veces falla con "fetch failed" por un hipo de red
 // transitorio (común en Windows / detrás de VPN), sin que la API externa
 // tenga la culpa. Un reintento simple resuelve la gran mayoría de estos casos.
-const fetchConReintento = async (url, options, intentos = 2) => {
+const fetchConReintento = async (url, options = {}, intentos = 2) => {
     for (let intento = 1; intento <= intentos; intento++) {
         try {
-            return await fetch(url, options);
+            // Si el proveedor externo se cuelga (sin responder ni dar error), despues
+            // de 15s abortamos: sin esto, una API externa colgada deja la peticion
+            // del cliente esperando para siempre, sin mensaje de error.
+            return await fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
         } catch (error) {
             const esUltimoIntento = intento === intentos;
-            console.error(`⚠️ fetch falló (intento ${intento}/${intentos}): ${error.message}`);
-            if (esUltimoIntento) throw error;
+            const motivo = error.name === 'TimeoutError' ? 'tardó más de 15s en responder' : error.message;
+            console.error(`⚠️ fetch falló (intento ${intento}/${intentos}): ${motivo}`);
+            if (esUltimoIntento) throw new Error(error.name === 'TimeoutError' ? 'El proveedor externo no respondió a tiempo' : error.message);
             await new Promise((resolve) => setTimeout(resolve, 500));
         }
     }
@@ -92,7 +96,13 @@ const obtenerProductoShein = async (productUrl) => {
         title: data.name,
         price: data.pricing?.sale_price?.amount,
         currency: 'USD',
-        images: data.images || []
+        images: data.images || [],
+        sizes: (data.sizes || [])
+            .filter(s => s.size)
+            .map(s => ({ size: s.size, inStock: s.in_stock !== false })),
+        colors: (data.colors || [])
+            .filter(c => c.name && c.link)
+            .map(c => ({ name: c.name, link: c.link, image: c.image || '', current: c.goods_id === data.goods_id }))
     };
 };
 
@@ -207,7 +217,12 @@ const searchProduct = async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error en el motor de búsqueda:', error.message);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        // Si falló el proveedor externo (Scrapingdog/Omkar Cloud caído o lento), le
+        // mostramos al cliente un mensaje claro en vez de un genérico "error interno".
+        const esProveedorExterno = /Scrapingdog respondió|Omkar Cloud|no respondió a tiempo/.test(error.message);
+        res.status(esProveedorExterno ? 502 : 500).json({
+            error: esProveedorExterno ? error.message : 'Error interno del servidor'
+        });
     }
 };
 
@@ -239,7 +254,10 @@ const searchByKeyword = async (req, res) => {
         res.json({ resultados: conMargen });
     } catch (error) {
         console.error('❌ Error en la búsqueda por texto:', error.message);
-        res.status(500).json({ error: 'Error interno al buscar productos' });
+        const esProveedorExterno = /Scrapingdog respondió|Omkar Cloud|no respondió a tiempo/.test(error.message);
+        res.status(esProveedorExterno ? 502 : 500).json({
+            error: esProveedorExterno ? error.message : 'Error interno al buscar productos'
+        });
     }
 };
 

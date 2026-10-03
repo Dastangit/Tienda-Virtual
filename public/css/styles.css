@@ -642,6 +642,25 @@ input:focus, .source-btn:focus-visible, .nav-link:focus-visible, .btn:focus-visi
   text-decoration: line-through;
   cursor: not-allowed;
 }
+.modal-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.color-chip {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg-elevated-2);
+  cursor: pointer;
+  overflow: hidden;
+}
+.color-chip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.color-chip:hover { border-color: var(--border-strong); }
+.color-chip.is-active { border-color: var(--cyan); }
 .modal-price {
   display: block;
   font-family: var(--font-mono);

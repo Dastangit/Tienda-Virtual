@@ -19,7 +19,7 @@ const obtenerCarrito = async (req, res) => {
 // 2. AGREGAR PRODUCTO AL CARRITO (Con separación de Fuentes)
 const agregarAlCarrito = async (req, res) => {
     try {
-        const { originalId, source } = req.body;
+        const { originalId, source, size, color } = req.body;
 
         if (!originalId || !source) {
             return res.status(400).json({ error: 'Se requiere originalId y source' });
@@ -31,6 +31,20 @@ const agregarAlCarrito = async (req, res) => {
         const productoCache = await ProductCache.findOne({ originalId, source });
         if (!productoCache) {
             return res.status(404).json({ error: 'Producto no encontrado en caché. Búscalo primero con /api/search antes de agregarlo al carrito.' });
+        }
+
+        // Si el producto maneja tallas, es obligatorio elegir una válida y con stock
+        if (productoCache.sizes && productoCache.sizes.length > 0) {
+            if (!size) {
+                return res.status(400).json({ error: 'Este producto tiene tallas disponibles. Debes elegir una.' });
+            }
+            const tallaElegida = productoCache.sizes.find(s => s.size === size);
+            if (!tallaElegida) {
+                return res.status(400).json({ error: 'Talla inválida para este producto.' });
+            }
+            if (tallaElegida.inStock === false) {
+                return res.status(400).json({ error: `La talla ${size} no tiene stock disponible.` });
+            }
         }
 
         const title = productoCache.title;
@@ -57,7 +71,7 @@ const agregarAlCarrito = async (req, res) => {
             }
         }
 
-        carrito.items.push({ originalId, source, title, price, precioFinalCliente, image });
+        carrito.items.push({ originalId, source, title, price, precioFinalCliente, image, size, color });
         await carrito.save();
 
         res.status(201).json({
@@ -158,7 +172,9 @@ const formatearOrden = (carrito) => {
         productos: carrito.items.map(item => ({
             titulo: item.title,
             precio: item.precioFinalCliente,
-            imagen: item.image || ''
+            imagen: item.image || '',
+            talla: item.size || '',
+            color: item.color || ''
         })),
         desglose: {
             subtotal: parseFloat(subtotal.toFixed(2)),
