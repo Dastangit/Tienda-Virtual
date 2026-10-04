@@ -23,6 +23,10 @@ connectDB();
 // 3. CREAR EL SERVIDOR: Inicializamos Express
 const app = express();
 
+// Render (y cualquier proxy inverso) pone la IP real del cliente en X-Forwarded-For.
+// Sin esto, el limitador de intentos veria a todos los usuarios como una sola IP.
+app.set('trust proxy', 1);
+
 // 4. MIDDLEWARES: Configuraciones intermedias (los "porteros")
 app.use(cors());
 app.use(express.json());

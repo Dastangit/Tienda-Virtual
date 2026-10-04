@@ -3,10 +3,10 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
 // Función interna para fabricar el gafete digital (JWT)
-const generarToken = (id) => {
-    // Usamos el secreto que guardaste en tu archivo .env
+// Los administradores reciben un token corto (8h); los clientes, 30 días.
+const generarToken = (id, role) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
-        expiresIn: '30d', // El usuario se mantendrá logueado por 30 días
+        expiresIn: role === 'admin' ? '8h' : '30d',
     });
 };
 
@@ -23,6 +23,13 @@ const registrarUsuario = async (req, res) => {
         const { name, password } = req.body;
         const phone = normalizarTelefono(req.body.phone);
 
+        if (typeof name !== 'string' || !name.trim()) {
+            return res.status(400).json({ error: 'Ingresa tu nombre' });
+        }
+        if (typeof password !== 'string' || password.length < 6) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        }
+
         if (!phone || phone.replace('+', '').length < 8) {
             return res.status(400).json({ error: 'Ingresa un número de teléfono válido (con código de país, ej: +18095551234)' });
         }
@@ -35,7 +42,7 @@ const registrarUsuario = async (req, res) => {
 
         // Creamos al usuario (la contraseña se encripta automáticamente por la regla en User.js)
         const user = await User.create({
-            name,
+            name: name.trim(),
             phone,
             password
         });
@@ -45,7 +52,8 @@ const registrarUsuario = async (req, res) => {
                 _id: user.id,
                 name: user.name,
                 phone: user.phone,
-                token: generarToken(user._id)
+                role: user.role,
+                token: generarToken(user._id, user.role)
             });
         }
     } catch (error) {
@@ -60,6 +68,10 @@ const loginUsuario = async (req, res) => {
         const phone = normalizarTelefono(req.body.phone);
         const { password } = req.body;
 
+        if (!phone || typeof password !== 'string' || !password) {
+            return res.status(400).json({ error: 'Ingresa tu teléfono y contraseña' });
+        }
+
         // Buscamos al usuario por su número
         const user = await User.findOne({ phone });
 
@@ -70,7 +82,7 @@ const loginUsuario = async (req, res) => {
                 name: user.name,
                 phone: user.phone,
                 role: user.role,
-                token: generarToken(user._id)
+                token: generarToken(user._id, user.role)
             });
         } else {
             res.status(401).json({ error: 'Credenciales inválidas (teléfono o contraseña incorrectos)' });

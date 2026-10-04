@@ -27,7 +27,7 @@ const cartSchema = new mongoose.Schema({
     status: {
         type: String,
         default: 'activo',
-        enum: ['activo', 'cotizando', 'pagado', 'completado']
+        enum: ['activo', 'cotizando', 'pendiente_pago', 'pagado', 'completado']
     },
 
     // Costo de envío final, asignado por el administrador al resolver la cotización

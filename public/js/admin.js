@@ -107,7 +107,7 @@ $all('.admin-tabs .source-btn').forEach(btn => {
     $all('.admin-tabs .source-btn').forEach(b => b.classList.remove('is-active'));
     btn.classList.add('is-active');
     state.status = btn.dataset.status;
-    const titulos = { cotizando: 'Cotizaciones pendientes', pagado: 'Pedidos pagados, por completar', completado: 'Pedidos completados' };
+    const titulos = { cotizando: 'Cotizaciones pendientes', pendiente_pago: 'Esperando que el cliente pague', pagado: 'Pedidos pagados, por completar', completado: 'Pedidos completados' };
     $('#dashboardTitle').textContent = titulos[state.status] || '';
     loadQuotes();
   });
@@ -146,6 +146,9 @@ async function loadQuotes() {
   $all('.quote-complete-btn', list).forEach(btn => {
     btn.addEventListener('click', onCompleteClick);
   });
+  $all('.quote-confirm-pago-btn', list).forEach(btn => {
+    btn.addEventListener('click', onConfirmPagoClick);
+  });
   $all('.price-check-btn', list).forEach(btn => {
     btn.addEventListener('click', onPriceCheckClick);
   });
@@ -169,8 +172,15 @@ function renderQuoteCard(carrito) {
     accionHtml = `
       <form class="quote-assign-form">
         <input type="number" name="costoEnvio" step="0.01" min="0" placeholder="Costo de envío" required>
-        <button type="submit" class="btn btn-stamp btn-sm">Asignar y marcar pagado</button>
+        <button type="submit" class="btn btn-stamp btn-sm">Asignar costo de envío</button>
       </form>
+    `;
+  } else if (carrito.status === 'pendiente_pago') {
+    accionHtml = `
+      <div class="quote-assign-form">
+        <span class="manifest-item-price">Envío: ${money(carrito.costoEnvio)} · Total: ${money(subtotal + (carrito.costoEnvio || 0))}</span>
+        <button type="button" class="btn btn-stamp btn-sm quote-confirm-pago-btn">Confirmar pago recibido</button>
+      </div>
     `;
   } else if (carrito.status === 'pagado') {
     accionHtml = `
@@ -239,6 +249,22 @@ async function onCompleteClick(e) {
   try {
     const data = await api(`/api/admin/carritos/${cartId}/completar`, { method: 'PUT' });
     toast(data.mensaje || 'Pedido completado');
+    loadQuotes();
+  } catch (err) {
+    setError(errId, err.message);
+    e.target.disabled = false;
+  }
+}
+
+async function onConfirmPagoClick(e) {
+  const card = e.target.closest('.quote-card');
+  const cartId = card.dataset.cartId;
+  const errId = `quote-${cartId}`;
+  setError(errId, '');
+  e.target.disabled = true;
+  try {
+    const data = await api(`/api/admin/carritos/${cartId}/confirmar-pago`, { method: 'PUT' });
+    toast(data.mensaje || 'Pago confirmado');
     loadQuotes();
   } catch (err) {
     setError(errId, err.message);

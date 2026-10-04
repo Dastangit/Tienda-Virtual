@@ -6,7 +6,7 @@ const { calcularPrecioFinal } = require('../utils/pricing');
 const obtenerCotizaciones = async (req, res) => {
     try {
         const status = req.query.status || 'cotizando';
-        const estadosValidos = ['cotizando', 'pagado', 'completado'];
+        const estadosValidos = ['cotizando', 'pendiente_pago', 'pagado', 'completado'];
 
         if (!estadosValidos.includes(status)) {
             return res.status(400).json({ error: `Estado inválido. Usa uno de: ${estadosValidos.join(', ')}` });
@@ -46,11 +46,11 @@ const asignarCostoEnvio = async (req, res) => {
         }
 
         carrito.costoEnvio = costoEnvio;
-        carrito.status = 'pagado';
+        carrito.status = 'pendiente_pago';
         await carrito.save();
 
         res.json({
-            mensaje: '📦 Costo de envío asignado. El carrito quedó marcado como "pagado".',
+            mensaje: '📦 Costo de envío asignado. Esperando que el cliente pague.',
             carrito
         });
     } catch (error) {
@@ -59,7 +59,38 @@ const asignarCostoEnvio = async (req, res) => {
     }
 };
 
-// 3. MARCAR UN CARRITO PAGADO COMO COMPLETADO (entregado)
+// 3. CONFIRMAR QUE EL CLIENTE YA PAGÓ (pendiente_pago -> pagado)
+// El pago ocurre fuera del sistema (WhatsApp, transferencia, etc.); este botón
+// es el admin diciendo "ya verifiqué que entró el dinero".
+const confirmarPago = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const carrito = await Cart.findById(id);
+
+        if (!carrito) {
+            return res.status(404).json({ error: 'Carrito no encontrado' });
+        }
+
+        if (carrito.status !== 'pendiente_pago') {
+            return res.status(400).json({
+                error: `Este carrito está en estado "${carrito.status}". Solo se puede confirmar el pago de un carrito en "pendiente_pago".`
+            });
+        }
+
+        carrito.status = 'pagado';
+        await carrito.save();
+
+        res.json({
+            mensaje: '💰 Pago confirmado.',
+            carrito
+        });
+    } catch (error) {
+        console.error('❌ Error al confirmar el pago:', error.message);
+        res.status(500).json({ error: 'Error interno al confirmar el pago' });
+    }
+};
+
+// 4. MARCAR UN CARRITO PAGADO COMO COMPLETADO (entregado)
 const marcarCompletado = async (req, res) => {
     try {
         const { id } = req.params;
@@ -134,4 +165,4 @@ const verificarPrecios = async (req, res) => {
     }
 };
 
-module.exports = { obtenerCotizaciones, asignarCostoEnvio, marcarCompletado, verificarPrecios };
+module.exports = { obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios };

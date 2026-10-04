@@ -24,7 +24,6 @@
         <button class="nav-link" data-view="cart">Carrito <span id="cartCount" class="cart-count">0</span></button>
         <button class="nav-link" data-view="orders">Mis cotizaciones</button>
         <button class="nav-link" data-view="services">Servicios</button>
-        <button class="nav-link" data-view="admin" id="adminNavLink" hidden>Admin</button>
         <button class="nav-link nav-exit" id="logoutBtn">Salir</button>
       </nav>
     </div>
@@ -169,21 +168,6 @@
           <a href="https://dastanxtech.com" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Mas informacion</a>
         </div>
       </div>
-    </section>
-
-      <!-- ===== ADMIN ===== -->
-    <section id="view-admin" class="view" hidden>
-      <p class="eyebrow">Panel</p>
-      <h1>Administracion</h1>
-
-      <div class="status-toggle">
-        <button type="button" class="status-tab is-active" data-admin-status="cotizando">Cotizando</button>
-        <button type="button" class="status-tab" data-admin-status="pagado">Pagado</button>
-        <button type="button" class="status-tab" data-admin-status="completado">Completado</button>
-      </div>
-
-      <div id="adminEmpty" class="empty-state" hidden><p>No hay carritos en este estado.</p></div>
-      <div id="adminList"></div>
     </section>
 
   </main>

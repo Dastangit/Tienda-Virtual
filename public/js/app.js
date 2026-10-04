@@ -10,7 +10,6 @@ const state = {
   token: localStorage.getItem(TOKEN_KEY) || null,
   role: localStorage.getItem(ROLE_KEY) || null,
   source: 'amazon',
-  adminStatus: 'cotizando',
   modalItem: null, // { originalId, source } del producto que esta abierto en el modal
   modalSize: null, // talla elegida en el modal (si el producto maneja tallas)
 };
@@ -51,6 +50,12 @@ async function api(path, options = {}) {
   try { data = await res.json(); } catch (_) { /* sin body */ }
 
   if (!res.ok) {
+    // Sesion vencida o invalida (no aplica al login, donde 401 = credenciales malas)
+    if (res.status === 401 && state.token && !path.startsWith('/api/users/')) {
+      logout();
+      toast('Tu sesión expiró. Inicia sesión de nuevo.');
+      throw new Error('Sesión expirada');
+    }
     const msg = (data && data.error) || `Error ${res.status}`;
     throw new Error(msg);
   }
@@ -71,7 +76,6 @@ function setRole(role) {
 }
 
 function isLoggedIn() { return !!state.token; }
-function isAdmin() { return state.role === 'admin'; }
 
 function logout() {
   setToken(null);
@@ -81,7 +85,7 @@ function logout() {
 }
 
 // ---------- views ----------
-const VIEWS = ['auth', 'search', 'cart', 'orders', 'services', 'admin'];
+const VIEWS = ['auth', 'search', 'cart', 'orders', 'services'];
 
 function showView(name) {
   VIEWS.forEach(v => { $(`#view-${v}`).hidden = v !== name; });
@@ -90,7 +94,6 @@ function showView(name) {
   });
   if (name === 'cart') renderCart();
   if (name === 'orders') renderOrders();
-  if (name === 'admin') renderAdmin();
 }
 
 $all('[data-view]').forEach(btn => {
@@ -146,7 +149,6 @@ $('#registerForm').addEventListener('submit', async (e) => {
 
 function onLoggedIn() {
   $('#appNav').hidden = false;
-  $('#adminNavLink').hidden = !isAdmin();
   showView('search');
   refreshCartCount();
 }
@@ -505,123 +507,6 @@ async function renderOrders() {
   }).join('');
 }
 
-// ---------- admin ----------
-$all('.status-tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    $all('.status-tab').forEach(b => b.classList.remove('is-active'));
-    btn.classList.add('is-active');
-    state.adminStatus = btn.dataset.adminStatus;
-    renderAdmin();
-  });
-});
-
-async function renderAdmin() {
-  const empty = $('#adminEmpty');
-  const list = $('#adminList');
-  list.innerHTML = '';
-  empty.hidden = true;
-
-  let carritos;
-  try {
-    carritos = await api(`/api/admin/carritos?status=${state.adminStatus}`);
-  } catch (err) {
-    toast(err.message);
-    return;
-  }
-
-  if (!carritos.length) {
-    empty.hidden = false;
-    return;
-  }
-
-  list.innerHTML = carritos.map(c => {
-    const subtotal = c.items.reduce((s, it) => s + it.precioFinalCliente, 0);
-    const statusClass = `is-${c.status}`;
-    const cliente = c.user ? `${escapeHtml(c.user.name)} - ${escapeHtml(c.user.phone)}` : 'Cliente';
-
-    const productosHtml = c.items.map(it => `
-      <div class="order-product">
-        <img src="${it.image || ''}" alt="" loading="lazy">
-        <span class="order-product-title">${escapeHtml(it.title)}${it.size ? ' · Talla ' + escapeHtml(it.size) : ''}${it.color ? ' · ' + escapeHtml(it.color) : ''}</span>
-        <span class="order-product-price">${money(it.precioFinalCliente)}</span>
-      </div>
-    `).join('');
-
-    let footerHtml = '';
-    if (c.status === 'cotizando') {
-      footerHtml = `
-        <div class="envio-row">
-          <input type="number" min="0" step="0.01" class="envio-input" placeholder="Costo de envio" data-envio-input="${c._id}">
-          <button class="btn btn-primary btn-sm" data-action="asignar" data-id="${c._id}">Asignar y marcar pagado</button>
-        </div>
-        <p class="form-error" data-envio-error="${c._id}"></p>
-      `;
-    } else if (c.status === 'pagado') {
-      footerHtml = `
-        <p class="manifest-item-price">Envio: ${money(c.costoEnvio)} - Total: ${money(subtotal + c.costoEnvio)}</p>
-        <button class="btn btn-primary btn-sm" data-action="completar" data-id="${c._id}">Marcar completado</button>
-      `;
-    } else {
-      footerHtml = `<p class="manifest-item-price">Envio: ${money(c.costoEnvio)} - Total: ${money(subtotal + c.costoEnvio)}</p>`;
-    }
-
-    return `
-      <div class="order-card">
-        <div class="order-head">
-          <span class="order-id">${cliente}</span>
-          <span class="order-status ${statusClass}">${c.status}</span>
-        </div>
-        <div class="order-products">${productosHtml}</div>
-        <div class="order-head" style="margin-bottom:0">
-          <span>Subtotal</span>
-          <span class="order-total">${money(subtotal)}</span>
-        </div>
-        ${footerHtml}
-      </div>
-    `;
-  }).join('');
-
-  $all('[data-action="asignar"]', list).forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const input = $(`[data-envio-input="${id}"]`, list);
-      const errEl = $(`[data-envio-error="${id}"]`, list);
-      const costoEnvio = Number(input.value);
-      errEl.textContent = '';
-      if (!input.value || costoEnvio < 0) {
-        errEl.textContent = 'Indica un costo de envio valido';
-        return;
-      }
-      btn.disabled = true;
-      try {
-        await api(`/api/admin/carritos/${id}/envio`, {
-          method: 'PUT',
-          body: JSON.stringify({ costoEnvio })
-        });
-        toast('Envio asignado, carrito marcado como pagado');
-        renderAdmin();
-      } catch (err) {
-        errEl.textContent = err.message;
-        btn.disabled = false;
-      }
-    });
-  });
-
-  $all('[data-action="completar"]', list).forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      btn.disabled = true;
-      try {
-        await api(`/api/admin/carritos/${id}/completar`, { method: 'PUT' });
-        toast('Pedido marcado como completado');
-        renderAdmin();
-      } catch (err) {
-        toast(err.message);
-        btn.disabled = false;
-      }
-    });
-  });
-}
 // ---------- boot ----------
 (function boot() {
   if (isLoggedIn()) {
