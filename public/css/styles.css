@@ -449,7 +449,7 @@ input:focus, .source-btn:focus-visible, .nav-link:focus-visible, .btn:focus-visi
 /* ===== Servicios ===== */
 .service-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-top: 8px;
 }
@@ -692,6 +692,7 @@ input:focus, .source-btn:focus-visible, .nav-link:focus-visible, .btn:focus-visi
 @media (max-width: 560px) {
   .steps { grid-template-columns: 1fr; }
   .results-grid { grid-template-columns: repeat(2, 1fr); }
+  .service-grid { grid-template-columns: 1fr; }
   .nav { gap: 0; }
   .nav-link { padding: 8px 8px; font-size: 0.85rem; }
   .modal-gallery { grid-template-columns: repeat(2, 1fr); }
