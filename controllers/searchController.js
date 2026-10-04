@@ -6,18 +6,19 @@ const { calcularPrecioFinal } = require('../utils/pricing');
 // fetch nativo de Node a veces falla con "fetch failed" por un hipo de red
 // transitorio (común en Windows / detrás de VPN), sin que la API externa
 // tenga la culpa. Un reintento simple resuelve la gran mayoría de estos casos.
-const fetchConReintento = async (url, options = {}, intentos = 2) => {
+const fetchConReintento = async (url, options = {}, intentos = 2, timeoutMs = 15000) => {
     for (let intento = 1; intento <= intentos; intento++) {
         try {
             // Si el proveedor externo se cuelga (sin responder ni dar error), despues
             // de 15s abortamos: sin esto, una API externa colgada deja la peticion
             // del cliente esperando para siempre, sin mensaje de error.
-            return await fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+            return await fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
         } catch (error) {
             const esUltimoIntento = intento === intentos;
-            const motivo = error.name === 'TimeoutError' ? 'tardó más de 15s en responder' : error.message;
+            const esTimeoutLargo = error.name === 'TimeoutError' && timeoutMs > 15000;
+            const motivo = error.name === 'TimeoutError' ? `tardo mas de ${timeoutMs / 1000}s en responder` : error.message;
             console.error(`⚠️ fetch falló (intento ${intento}/${intentos}): ${motivo}`);
-            if (esUltimoIntento) throw new Error(error.name === 'TimeoutError' ? 'El proveedor externo no respondió a tiempo' : error.message);
+            if (esUltimoIntento || esTimeoutLargo) throw new Error(error.name === 'TimeoutError' ? 'El proveedor externo no respondió a tiempo' : error.message);
             await new Promise((resolve) => setTimeout(resolve, 500));
         }
     }
@@ -82,7 +83,7 @@ const obtenerProductoShein = async (productUrl) => {
 
     const response = await fetchConReintento(`https://shein-scraper.omkar.cloud/shein/products/details?${params.toString()}`, {
         headers: { 'API-Key': process.env.OMKAR_SHEIN_API_KEY }
-    });
+    }, 2, 70000);
 
     if (!response.ok) {
         throw new Error(`Omkar Cloud (Shein) respondió ${response.status}`);
@@ -141,7 +142,7 @@ const buscarPorTextoShein = async (query) => {
 
     const response = await fetchConReintento(`https://shein-scraper.omkar.cloud/shein/search/products?${params.toString()}`, {
         headers: { 'API-Key': process.env.OMKAR_SHEIN_API_KEY }
-    });
+    }, 2, 70000);
     if (!response.ok) {
         throw new Error(`Omkar Cloud (Shein) respondió ${response.status}`);
     }
