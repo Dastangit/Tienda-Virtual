@@ -236,6 +236,7 @@ input:focus, .source-btn:focus-visible, .nav-link:focus-visible, .btn:focus-visi
 .btn-stamp:disabled { opacity: 0.5; cursor: default; filter: none; }
 .btn-block { width: 100%; }
 .btn-sm { padding: 8px 14px; font-size: 0.85rem; }
+a.btn { text-decoration: none; display: inline-block; text-align: center; }
 .link-btn {
   background: none; border: none; padding: 0;
   color: var(--cyan); font-weight: 600; cursor: pointer;
