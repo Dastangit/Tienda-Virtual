@@ -35,6 +35,26 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
+// Enlace a la pagina real del producto en la tienda de origen.
+// Amazon: el originalId es el ASIN. Shein: el originalId es la URL del producto.
+// Por seguridad solo se aceptan enlaces https a amazon.com / shein.com.
+function productUrl(item) {
+  const id = String(item?.originalId || '').trim();
+  if (!id) return '';
+  try {
+    if (item.source === 'amazon') {
+      if (!/^[A-Za-z0-9]{10}$/.test(id)) return '';
+      return `https://www.amazon.com/dp/${id}`;
+    }
+    if (item.source === 'shein') {
+      const u = new URL(id);
+      const hostOk = u.hostname === 'shein.com' || u.hostname.endsWith('.shein.com');
+      return (u.protocol === 'https:' && hostOk) ? u.href : '';
+    }
+  } catch (_) { /* URL invalida */ }
+  return '';
+}
+
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
@@ -159,13 +179,22 @@ function renderQuoteCard(carrito) {
   const tienda = (carrito.items[0]?.source || '').toUpperCase();
   const fecha = new Date(carrito.updatedAt).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-  const productosHtml = carrito.items.map(i => `
+  const productosHtml = carrito.items.map(i => {
+    const url = productUrl(i);
+    const tiendaNombre = i.source === 'shein' ? 'Shein' : 'Amazon';
+    const opciones = [i.size && `Talla: ${i.size}`, i.color && `Color: ${i.color}`].filter(Boolean).join(' · ');
+    return `
     <div class="order-product">
       <img src="${i.image || ''}" alt="" loading="lazy">
-      <span class="order-product-title">${escapeHtml(i.title)}</span>
+      <span class="order-product-title">
+        ${escapeHtml(i.title)}
+        ${opciones ? `<span class="order-product-opts">${escapeHtml(opciones)}</span>` : ''}
+        ${url ? `<a class="order-product-link" href="${url.replace(/"/g, '%22')}" target="_blank" rel="noopener noreferrer">Ver en ${tiendaNombre} ↗</a>` : ''}
+      </span>
       <span class="order-product-price">${money(i.precioFinalCliente)}</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   let accionHtml = '';
   if (carrito.status === 'cotizando') {

@@ -523,6 +523,22 @@ a.btn { text-decoration: none; display: inline-block; text-align: center; }
   color: var(--text-soft);
   flex: 1;
 }
+.order-product-opts {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.order-product-link {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cyan);
+  text-decoration: none;
+}
+.order-product-link:hover { text-decoration: underline; }
 .order-product-price {
   font-family: var(--font-mono);
   font-size: 0.82rem;
