@@ -34,6 +34,12 @@ const cartSchema = new mongoose.Schema({
     costoEnvio: {
         type: Number,
         default: 0
+    },
+
+    // Fecha en que el admin confirmó el pago. Sirve para reportes por mes
+    // (updatedAt cambia con cualquier edición, así que no es confiable para eso).
+    pagadoAt: {
+        type: Date
     }
 }, { timestamps: true });
 

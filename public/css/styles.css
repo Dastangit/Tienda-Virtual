@@ -741,3 +741,16 @@ a.btn { text-decoration: none; display: inline-block; text-align: center; }
 }
 .envio-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .envio-input { width: 150px; }
+
+/* ----- Footer y página legal (términos) ----- */
+.site-footer { padding: 32px 24px 40px; text-align: center; font-size: 0.85rem; }
+.site-footer a, .legal-hint a, .legal a { color: var(--text-soft); text-decoration: underline; text-underline-offset: 3px; }
+.site-footer a:hover, .legal-hint a:hover, .legal a:hover { color: var(--text); }
+.legal-hint { margin: 4px 0 0; font-size: 0.8rem; color: var(--text-faint); }
+.legal { padding-top: 32px; padding-bottom: 48px; }
+.legal h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+.legal p, .legal li { color: var(--text-soft); }
+.legal ul { padding-left: 20px; }
+.legal li { margin-bottom: 6px; }
+.legal strong { color: var(--text); }
+.legal-note { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-faint) !important; }

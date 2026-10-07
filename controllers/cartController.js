@@ -189,7 +189,7 @@ const generarTicket = async (req, res) => {
         // Buscamos un carrito que ya haya solicitado cotización
         const carrito = await Cart.findOne({ 
             user: req.user._id, 
-            status: { $in: ['cotizando', 'pagado'] } 
+            status: { $in: ['cotizando', 'pendiente_pago', 'pagado'] } 
         });
 
         if (!carrito || carrito.items.length === 0) {

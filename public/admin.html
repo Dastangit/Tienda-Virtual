@@ -56,6 +56,16 @@
         <button id="refreshBtn" type="button" class="btn btn-sm btn-ghost">Refrescar</button>
       </div>
 
+      <!-- Resumen general -->
+      <div id="statsGrid" class="stats-grid" hidden></div>
+      <details id="statsDetails" class="stats-details" hidden>
+        <summary>Últimos meses</summary>
+        <table class="stats-months">
+          <thead><tr><th>Mes</th><th>Pedidos</th><th>Facturado</th><th>Margen</th></tr></thead>
+          <tbody id="statsMonths"></tbody>
+        </table>
+      </details>
+
       <div class="source-toggle admin-tabs" role="radiogroup" aria-label="Estado">
         <button type="button" class="source-btn is-active" data-status="cotizando">Cotizando</button>
         <button type="button" class="source-btn" data-status="pendiente_pago">Pendiente de pago</button>

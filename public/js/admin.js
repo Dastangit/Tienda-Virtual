@@ -133,7 +133,31 @@ $all('.admin-tabs .source-btn').forEach(btn => {
   });
 });
 
+async function loadStats() {
+  try {
+    const s = await api('/api/admin/stats');
+    const m = s.mesActual;
+    $('#statsGrid').innerHTML = `
+      <div class="stat-card is-accent"><span class="stat-label">Facturado este mes</span><span class="stat-value">${money(m.facturado)}</span><span class="stat-sub">${m.pedidos} pedido(s) · margen ${money(m.margen)}</span></div>
+      <div class="stat-card"><span class="stat-label">Por cobrar</span><span class="stat-value">${money(s.porCobrar.monto)}</span><span class="stat-sub">${s.porCobrar.pedidos} pedido(s) esperando pago</span></div>
+      <div class="stat-card"><span class="stat-label">Cotizando</span><span class="stat-value">${s.conteos.cotizando}</span><span class="stat-sub">falta asignar envío</span></div>
+      <div class="stat-card"><span class="stat-label">Pagados</span><span class="stat-value">${s.conteos.pagado}</span><span class="stat-sub">por comprar/entregar</span></div>
+      <div class="stat-card"><span class="stat-label">Completados</span><span class="stat-value">${s.conteos.completado}</span><span class="stat-sub">entregados</span></div>
+    `;
+    $('#statsGrid').hidden = false;
+    $('#statsMonths').innerHTML = s.meses.map(x =>
+      `<tr><td>${escapeHtml(x.mes)}</td><td>${x.pedidos}</td><td>${money(x.facturado)}</td><td>${money(x.margen)}</td></tr>`
+    ).join('');
+    $('#statsDetails').hidden = s.meses.length === 0;
+  } catch (_) {
+    // El resumen es secundario: si falla, el panel de pedidos sigue funcionando.
+    $('#statsGrid').hidden = true;
+    $('#statsDetails').hidden = true;
+  }
+}
+
 async function loadQuotes() {
+  loadStats();
   const list = $('#quotesList');
   const empty = $('#quotesEmpty');
 
@@ -174,6 +198,17 @@ async function loadQuotes() {
   });
 }
 
+// Enlace de WhatsApp (wa.me) con el aviso ya escrito para el cliente. No usa API ni
+// cuesta nada: el admin solo toca el botón y envía el mensaje desde su propio WhatsApp.
+function whatsappAvisoUrl(carrito, subtotal) {
+  const digits = String(carrito.user?.phone || '').replace(/\D/g, '');
+  if (digits.length < 8) return '';
+  const envio = carrito.costoEnvio || 0;
+  const nombre = (carrito.user?.name || '').split(' ')[0];
+  const texto = `Hola${nombre ? ' ' + nombre : ''} 👋 Tu pedido #${String(carrito._id).slice(-6)} ya tiene el total listo para pagar: ${money(subtotal + envio)} (productos ${money(subtotal)} + envío ${money(envio)}). Entra a "Mis cotizaciones" en ${window.location.origin} para verlo y coordinar el pago.`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(texto)}`;
+}
+
 function renderQuoteCard(carrito) {
   const subtotal = carrito.items.reduce((acc, i) => acc + i.precioFinalCliente, 0);
   const tienda = (carrito.items[0]?.source || '').toUpperCase();
@@ -205,10 +240,14 @@ function renderQuoteCard(carrito) {
       </form>
     `;
   } else if (carrito.status === 'pendiente_pago') {
+    const waUrl = whatsappAvisoUrl(carrito, subtotal);
     accionHtml = `
       <div class="quote-assign-form">
         <span class="manifest-item-price">Envío: ${money(carrito.costoEnvio)} · Total: ${money(subtotal + (carrito.costoEnvio || 0))}</span>
-        <button type="button" class="btn btn-stamp btn-sm quote-confirm-pago-btn">Confirmar pago recibido</button>
+        <div class="quote-notify-row">
+          ${waUrl ? `<a class="btn btn-sm btn-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">Avisar por WhatsApp</a>` : ''}
+          <button type="button" class="btn btn-stamp btn-sm quote-confirm-pago-btn">Confirmar pago recibido</button>
+        </div>
       </div>
     `;
   } else if (carrito.status === 'pagado') {
@@ -262,7 +301,8 @@ async function onAssignSubmit(e) {
       body: JSON.stringify({ costoEnvio: Number(costoEnvio) })
     });
     toast(data.mensaje || 'Envío asignado');
-    loadQuotes();
+    // Saltamos a la pestaña "Pendiente de pago", donde está el botón para avisarle al cliente
+    $('.admin-tabs [data-status="pendiente_pago"]').click();
   } catch (err) {
     setError(errId, err.message);
     btn.disabled = false;

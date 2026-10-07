@@ -5,6 +5,9 @@ const API = '';
 const TOKEN_KEY = 'tv_token';
 const ROLE_KEY = 'tv_role';
 const MAX_MODAL_PHOTOS = 5;
+// A dónde va el cliente a coordinar el pago cuando su pedido está "Listo para pagar".
+// Cambia esta URL si prefieres otro canal.
+const PAYMENT_CONTACT_URL = 'https://wa.me/16055003653';
 
 const state = {
   token: localStorage.getItem(TOKEN_KEY) || null,
@@ -478,8 +481,13 @@ async function renderOrders() {
   empty.hidden = true;
 
   content.innerHTML = historial.map(t => {
-    const statusClass = t.estado === 'cotizando' ? 'is-cotizando' : 'is-pagado';
-    const statusLabel = t.estado === 'cotizando' ? 'Cotizando envío' : (t.estado === 'completado' ? 'Completado' : 'Envío asignado');
+    const statusClass = `is-${t.estado}`;
+    const statusLabel = {
+      cotizando: 'Cotizando envío',
+      pendiente_pago: 'Listo para pagar',
+      pagado: 'Pagado',
+      completado: 'Completado'
+    }[t.estado] || t.estado;
     const fecha = new Date(t.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' });
 
     const productosHtml = t.productos.map(p => `
@@ -502,6 +510,9 @@ async function renderOrders() {
           <span class="order-total">${money(t.desglose.totalPagar)}</span>
         </div>
         ${t.estado !== 'cotizando' ? `<p class="manifest-item-price" style="margin-top:8px">Subtotal ${money(t.desglose.subtotal)} + envío ${money(t.desglose.envio)}</p>` : ''}
+        ${t.estado === 'pendiente_pago' ? `
+          <p class="manifest-item-price" style="margin-top:8px">Tu total ya está listo. Escríbenos para coordinar el pago y empezamos tu compra.</p>
+          <a class="btn btn-stamp btn-sm" style="margin-top:8px" href="${PAYMENT_CONTACT_URL}" target="_blank" rel="noopener noreferrer">Coordinar pago de ${money(t.desglose.totalPagar)}</a>` : ''}
       </div>
     `;
   }).join('');

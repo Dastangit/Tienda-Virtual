@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios } = require('../controllers/adminController');
+const { obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas } = require('../controllers/adminController');
 const { protect, admin } = require('../middleware/authMiddleware');
+
+// GET /api/admin/stats -> resumen general: pedidos por estado, facturado/margen del mes, por cobrar
+router.get('/stats', protect, admin, obtenerEstadisticas);
 
 // GET /api/admin/carritos?status=cotizando|pagado|completado -> lista carritos por estado (por defecto "cotizando")
 router.get('/carritos', protect, admin, obtenerCotizaciones);

@@ -3,6 +3,7 @@ const dns = require('dns');
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 
 // En Windows (y a veces detrás de VPN), el fetch nativo de Node puede fallar
@@ -28,6 +29,21 @@ const app = express();
 app.set('trust proxy', 1);
 
 // 4. MIDDLEWARES: Configuraciones intermedias (los "porteros")
+// Helmet: headers de seguridad (anti-clickjacking, anti-sniffing de MIME, HSTS, CSP...).
+// La CSP por defecto de helmet solo permite imagenes 'self' y data:, lo que ROMPERIA
+// las fotos de productos (vienen de los CDN de Amazon/Shein). Por eso imgSrc admite https:.
+// Los scripts siguen limitados a 'self' (el frontend no usa scripts inline).
+const esProduccion = process.env.NODE_ENV === 'production';
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+            'img-src': ["'self'", 'data:', 'https:'],
+            // En desarrollo (http://localhost) forzar HTTPS rompe la carga de recursos
+            'upgrade-insecure-requests': esProduccion ? [] : null
+        }
+    }
+}));
 app.use(cors());
 app.use(express.json());
 
