@@ -199,14 +199,30 @@ async function loadQuotes() {
 }
 
 // Enlace de WhatsApp (wa.me) con el aviso ya escrito para el cliente. No usa API ni
-// cuesta nada: el admin solo toca el botón y envía el mensaje desde su propio WhatsApp.
+// cuesta nada: el admin solo toca el boton y envia el mensaje desde su propio WhatsApp.
+// wa.me exige el numero con codigo de pais. Si el cliente registro un movil cubano de
+// 8 digitos (empieza por 5), se le antepone 53.
+function telefonoWhatsapp(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length === 8 && digits.startsWith('5')) return `53${digits}`;
+  return digits.length >= 10 ? digits : '';
+}
+
 function whatsappAvisoUrl(carrito, subtotal) {
-  const digits = String(carrito.user?.phone || '').replace(/\D/g, '');
-  if (digits.length < 8) return '';
+  const tel = telefonoWhatsapp(carrito.user?.phone);
+  if (!tel) return '';
   const envio = carrito.costoEnvio || 0;
+  const total = money(subtotal + envio);
+  const orden = String(carrito._id).slice(-6);
   const nombre = (carrito.user?.name || '').split(' ')[0];
-  const texto = `Hola${nombre ? ' ' + nombre : ''} 👋 Tu pedido #${String(carrito._id).slice(-6)} ya tiene el total listo para pagar: ${money(subtotal + envio)} (productos ${money(subtotal)} + envío ${money(envio)}). Entra a "Mis cotizaciones" en ${window.location.origin} para verlo y coordinar el pago.`;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(texto)}`;
+  const saludo = `Hola${nombre ? ' ' + nombre : ''} \u{1F44B}`;
+  const mensajes = {
+    pendiente_pago: `${saludo} Tu pedido #${orden} ya tiene el total listo para pagar: ${total} (productos ${money(subtotal)} + env\u00edo ${money(envio)}). Entra a "Mis cotizaciones" en ${window.location.origin} para verlo y coordinar el pago.`,
+    pagado: `${saludo} Confirmamos el pago de tu pedido #${orden} (${total}). Ya estamos gestionando tu compra y te avisamos cuando est\u00e9 lista.`,
+    completado: `${saludo} Tu pedido #${orden} est\u00e1 completado. \u00a1Gracias por tu compra!`
+  };
+  const texto = mensajes[carrito.status];
+  return texto ? `https://wa.me/${tel}?text=${encodeURIComponent(texto)}` : '';
 }
 
 function renderQuoteCard(carrito) {
@@ -231,6 +247,7 @@ function renderQuoteCard(carrito) {
   `;
   }).join('');
 
+  const waUrl = whatsappAvisoUrl(carrito, subtotal);
   let accionHtml = '';
   if (carrito.status === 'cotizando') {
     accionHtml = `
@@ -240,7 +257,6 @@ function renderQuoteCard(carrito) {
       </form>
     `;
   } else if (carrito.status === 'pendiente_pago') {
-    const waUrl = whatsappAvisoUrl(carrito, subtotal);
     accionHtml = `
       <div class="quote-assign-form">
         <span class="manifest-item-price">Envío: ${money(carrito.costoEnvio)} · Total: ${money(subtotal + (carrito.costoEnvio || 0))}</span>
@@ -256,6 +272,7 @@ function renderQuoteCard(carrito) {
         <span class="manifest-item-price">Envío: ${money(carrito.costoEnvio)} · Total: ${money(subtotal + (carrito.costoEnvio || 0))}</span>
         <button type="button" class="btn btn-ghost btn-sm price-check-btn">Verificar precios actuales</button>
         <button type="button" class="btn btn-stamp btn-sm quote-complete-btn">Marcar como completado</button>
+        ${waUrl ? `<a class="btn btn-sm btn-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">Avisar por WhatsApp</a>` : ''}
       </div>
       <div class="price-check-result" hidden></div>
     `;
@@ -263,6 +280,7 @@ function renderQuoteCard(carrito) {
     accionHtml = `
       <div class="quote-assign-form">
         <span class="manifest-item-price">Envío: ${money(carrito.costoEnvio)} · Total: ${money(subtotal + (carrito.costoEnvio || 0))} · Entregado ✅</span>
+        ${waUrl ? `<a class="btn btn-sm btn-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">Avisar por WhatsApp</a>` : ''}
       </div>
     `;
   }

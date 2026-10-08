@@ -7,7 +7,9 @@ const { calcularPrecioFinal } = require('../utils/pricing');
 // Es opcional: si MAKE_WEBHOOK_CLIENTE_URL no está definida, no hace nada.
 // Nunca debe tumbar la petición del admin: solo se loguea el error. Timeout de 10s para
 // que un Make colgado no deje la promesa abierta.
-const notificarPagoPendiente = async (carrito) => {
+// Eventos que se envian en el campo evento: 'pendiente_pago' (total listo para pagar),
+// 'pagado' (pago confirmado) y 'completado' (pedido entregado). En Make se separan con un Router.
+const notificarCliente = async (carrito, evento) => {
     if (!process.env.MAKE_WEBHOOK_CLIENTE_URL) return;
 
     try {
@@ -20,7 +22,7 @@ const notificarPagoPendiente = async (carrito) => {
             headers: { 'Content-Type': 'application/json' },
             signal: AbortSignal.timeout(10000),
             body: JSON.stringify({
-                evento: 'pendiente_pago',
+                evento,
                 carritoId: carrito._id.toString(),
                 numeroOrden: String(carrito._id).slice(-6),
                 cliente: cliente?.name || '',
@@ -85,7 +87,7 @@ const asignarCostoEnvio = async (req, res) => {
         await carrito.save();
 
         // Aviso automático al cliente (no bloquea la respuesta al admin)
-        notificarPagoPendiente(carrito);
+        notificarCliente(carrito, 'pendiente_pago');
 
         res.json({
             mensaje: '📦 Costo de envío asignado. Esperando que el cliente pague.',
@@ -119,6 +121,9 @@ const confirmarPago = async (req, res) => {
         carrito.pagadoAt = new Date();
         await carrito.save();
 
+        // Aviso automatico al cliente (no bloquea la respuesta al admin)
+        notificarCliente(carrito, 'pagado');
+
         res.json({
             mensaje: '💰 Pago confirmado.',
             carrito
@@ -147,6 +152,9 @@ const marcarCompletado = async (req, res) => {
 
         carrito.status = 'completado';
         await carrito.save();
+
+        // Aviso automatico al cliente (no bloquea la respuesta al admin)
+        notificarCliente(carrito, 'completado');
 
         res.json({
             mensaje: '✅ Pedido marcado como completado.',
