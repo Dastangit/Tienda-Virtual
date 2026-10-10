@@ -10,3 +10,6 @@ scripts/*_sample*.json
 # Logs del servidor en la raiz y scripts con credenciales locales
 server-*.log
 scripts/reset-admin-password.js
+
+# Copias de seguridad de la base de datos (contienen datos de clientes)
+backups/
