@@ -44,7 +44,7 @@
         </div>
 
         <form id="loginForm" class="auth-form">
-          <label>Teléfono<input type="tel" name="phone" placeholder="+18095551234" required autocomplete="tel"></label>
+          <label>Teléfono<input type="tel" name="phone" placeholder="+53 5xxxxxxx" required autocomplete="tel"></label>
           <label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label>
           <button type="submit" class="btn btn-primary">Entrar</button>
           <p class="form-error" data-error-for="loginForm"></p>
@@ -52,7 +52,8 @@
 
         <form id="registerForm" class="auth-form" hidden>
           <label>Nombre<input type="text" name="name" required autocomplete="name"></label>
-          <label>Teléfono<input type="tel" name="phone" placeholder="+18095551234" required autocomplete="tel"></label>
+          <label>Teléfono<input type="tel" name="phone" placeholder="+53 5xxxxxxx" required autocomplete="tel"></label>
+          <p class="auth-hint">Incluye el c&oacute;digo de pa&iacute;s (ej. +53 para Cuba). Lo usamos para avisarte de tu pedido por WhatsApp.</p>
           <label>Contraseña<input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
           <button type="submit" class="btn btn-primary">Crear cuenta</button>
           <p class="legal-hint">Al crear tu cuenta aceptas los <a href="/terminos.html" target="_blank" rel="noopener">términos y condiciones</a>.</p>

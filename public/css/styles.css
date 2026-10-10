@@ -188,6 +188,7 @@ h3 { font-size: 1.15rem; }
 .auth-tab.is-active { color: var(--text); border-bottom-color: var(--cyan); }
 
 .auth-form { display: flex; flex-direction: column; gap: 14px; max-width: 340px; }
+.auth-hint { margin: -6px 0 0; font-size: 0.78rem; color: var(--text-soft); line-height: 1.4; }
 .auth-form label {
   display: flex;
   flex-direction: column;
