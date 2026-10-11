@@ -57,3 +57,14 @@ Arquitectura backend para un sistema de Proxy Shopping. Permite la búsqueda de 
 * Consumo de la API actual para construir la interfaz visual.
 * Opciones de arquitectura frontal: Desarrollar una aplicación móvil nativa utilizando **React Native** o una experiencia de navegador a través de una **PWA** (Progressive Web App).
 * **Diseño UI:** Aplicación del sistema de variables de alto contraste (incorporando tonalidades como `#F5F4EF` para fondos y `#1C2624` para elementos principales).
+
+---
+
+## 🔎 Ajustes de Búsqueda (Oct 2026)
+Auditoría de puntos débiles del buscador y correcciones aplicadas (`searchController.js`, `public/js/app.js`, `public/index.html`):
+* **Calidad por defecto:** el filtro "4★ o más" ahora arranca activo y exige además un mínimo de 10 reseñas (`MIN_RESENAS` en `app.js`), para que "más baratos" no empiece con productos basura. El cliente puede apagarlo.
+* **Reseñas como texto:** `parsearConteo()` convierte valores tipo "12.7K", "1,234" o "2M" a número en Amazon (`reviews` o `total_reviews`) y Shein (`reviews_count`). En pruebas reales Scrapingdog devolvió el conteo como número (redondeado).
+* **Sets sin cantidad:** los títulos con "Set/Kit/Combo" sin número reciben `cantidadDesconocida`. La tarjeta muestra "Cantidad no indicada" y, con orden "precio por pieza", van al final de la lista.
+* **Páginas:** `MAX_PAGINAS` baja de 10 a 4 en el servidor, igual que el tope de la pantalla.
+* **Caché de búsquedas:** el servidor guarda 10 minutos en memoria (máx. 200 entradas) lo que devuelve el proveedor. Repetir una búsqueda o cambiar a un orden que pide lo mismo a Shein no gasta otra llamada. Se vacía al reiniciar el servidor.
+* **Limitaciones conocidas:** en Amazon "Más baratos" solo ordena lo ya cargado (~48 por página); el parámetro `sort_by=price-asc-rank` no tuvo efecto en Scrapingdog. En Shein, cambiar el rango de precio o el grupo de orden gasta una llamada; abrir el detalle de un producto fuera de caché también.

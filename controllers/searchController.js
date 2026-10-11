@@ -112,6 +112,16 @@ const obtenerProductoShein = async (productUrl) => {
 //    Devuelve una lista liviana de candidatos, sin cachear todavía.
 // Orden elegido en la UI -> orden que se le pide a Shein (Omkar). El resto (precio por
 // pieza, valoracion) se aplica aqui mismo sobre los resultados ya traidos.
+// Convierte conteos de resenas que a veces llegan como texto ("12.7K", "1,234", "2M") a numero.
+const parsearConteo = (v) => {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+    const m = String(v || '').replace(/,/g, '').match(/([\d.]+)\s*([kKmM])?/);
+    if (!m) return 0;
+    const n = parseFloat(m[1]);
+    if (!Number.isFinite(n)) return 0;
+    const mult = { k: 1e3, m: 1e6 }[(m[2] || '').toLowerCase()] || 1;
+    return Math.round(n * mult);
+};
 const ORDENES = ['cheapest', 'unit', 'popular', 'rated', 'relevance'];
 const ORDEN_SHEIN = {
     cheapest: 'price_low_to_high',
@@ -120,8 +130,27 @@ const ORDEN_SHEIN = {
     rated: 'most_popular',
     relevance: 'recommend'
 };
-const MAX_PAGINAS = 10;
-const MAX_PAGINAS_AMAZON = 5;
+const MAX_PAGINAS = 4;
+// Tope de paginas que el cliente puede cargar con "Cargar mas": evita acumular cientos de
+// tarjetas en el celular y limita los creditos gastados por una sola busqueda.
+const MAX_PAGINAS_CARGA = 4;
+
+// Cache corto en memoria de lo que devuelve el proveedor (datos publicos, iguales para todos).
+// Repetir la misma busqueda, o cambiar entre ordenes que piden lo mismo al proveedor, ya no
+// gasta otra llamada. Se vacia solo al reiniciar el servidor.
+const CACHE_BUSQUEDA_MS = 10 * 60 * 1000;
+const CACHE_BUSQUEDA_MAX = 200;
+const cacheBusqueda = new Map();
+const leerCache = (clave) => {
+    const hit = cacheBusqueda.get(clave);
+    if (!hit) return null;
+    if (hit.expira < Date.now()) { cacheBusqueda.delete(clave); return null; }
+    return hit.valor;
+};
+const guardarCache = (clave, valor) => {
+    if (cacheBusqueda.size >= CACHE_BUSQUEDA_MAX) cacheBusqueda.delete(cacheBusqueda.keys().next().value);
+    cacheBusqueda.set(clave, { valor, expira: Date.now() + CACHE_BUSQUEDA_MS });
+};
 
 // 3. Busqueda por PALABRA CLAVE en Amazon (Scrapingdog Amazon Search API).
 //    Una llamada trae ~48 productos (mismo costo que antes, cuando solo usabamos 12).
@@ -153,7 +182,7 @@ const buscarPorTextoAmazon = async (query, { page = 1 } = {}) => {
                 price,
                 image: item.image,
                 rating: typeof item.rating === 'number' ? item.rating : (parseFloat(item.stars) || 0),
-                reviews: typeof item.reviews === 'number' ? item.reviews : 0,
+                reviews: parsearConteo(item.reviews ?? item.total_reviews),
                 discountPercent: viejo && viejo > price ? Math.round((1 - price / viejo) * 100) : 0,
                 category: '',
                 badge: item.is_best_seller ? 'Más vendido' : (item.is_amazon_choice ? "Amazon's Choice" : '')
@@ -161,7 +190,7 @@ const buscarPorTextoAmazon = async (query, { page = 1 } = {}) => {
         })
         .filter(r => Number.isFinite(r.price) && r.price > 0);
 
-    return { resultados, hayMas: items.length >= 20 && page < MAX_PAGINAS_AMAZON, totalPaginas: null, total: null };
+    return { resultados, hayMas: items.length >= 20 && page < MAX_PAGINAS_CARGA, totalPaginas: null, total: null };
 };
 
 // 4. Busqueda por PALABRA CLAVE en Shein (Omkar Cloud, mismo proveedor que el detalle).
@@ -189,14 +218,14 @@ const buscarPorTextoShein = async (query, { sort = 'recommend', minPrecio = null
             price: item.pricing.sale_price.amount,
             image: item.image,
             rating: item.rating || 0,
-            reviews: item.reviews_count || 0,
+            reviews: parsearConteo(item.reviews_count),
             discountPercent: item.pricing.discount_percent || 0,
             category: item.category?.name || '',
             badge: ''
         }));
 
     const totalPaginas = Math.min(data.total_pages || 1, MAX_PAGINAS);
-    return { resultados, hayMas: page < totalPaginas, totalPaginas, total: data.count ?? null };
+    return { resultados, hayMas: page < Math.min(totalPaginas, MAX_PAGINAS_CARGA), totalPaginas, total: data.count ?? null };
 };
 
 // Completa cada resultado con lo que ve el cliente: precio con margen, piezas del set y
@@ -217,14 +246,15 @@ const enriquecer = (r) => {
         piezas,
         esSet,
         precioFinalCliente,
-        precioUnidadCliente: parseFloat((precioFinalCliente / piezas).toFixed(2))
+        precioUnidadCliente: parseFloat((precioFinalCliente / piezas).toFixed(2)),
+        cantidadDesconocida: esSet && piezas === 1
     };
 };
 
 const ordenar = (lista, orden) => {
     const porPrecio = (a, b) => a.precioFinalCliente - b.precioFinalCliente;
     if (orden === 'cheapest') return [...lista].sort(porPrecio);
-    if (orden === 'unit') return [...lista].sort((a, b) => (a.precioUnidadCliente - b.precioUnidadCliente) || porPrecio(a, b));
+    if (orden === 'unit') return [...lista].sort((a, b) => (Number(a.cantidadDesconocida) - Number(b.cantidadDesconocida)) || (a.precioUnidadCliente - b.precioUnidadCliente) || porPrecio(a, b));
     if (orden === 'rated') return [...lista].sort((a, b) => (b.rating - a.rating) || (b.reviews - a.reviews));
     return lista; // popular / relevance: se respeta el orden que trae la tienda
 };
@@ -332,9 +362,17 @@ const searchByKeyword = async (req, res) => {
         const minOrigen = minExacto ? (ascendente ? Math.ceil(minExacto) : Math.floor(minExacto)) : null;
         const maxOrigen = maxCliente ? Math.ceil(precioOrigenDesdeFinal(maxCliente)) : null;
 
-        const busqueda = source === 'amazon'
-            ? await buscarPorTextoAmazon(query, { page })
-            : await buscarPorTextoShein(query, { sort: ORDEN_SHEIN[orden], minPrecio: minOrigen, maxPrecio: maxOrigen, page });
+        const texto = String(query).trim().toLowerCase();
+        const claveCache = source === 'amazon'
+            ? `amazon|${texto}|${page}`
+            : `shein|${texto}|${ORDEN_SHEIN[orden]}|${minOrigen || ''}|${maxOrigen || ''}|${page}`;
+        let busqueda = leerCache(claveCache);
+        if (!busqueda) {
+            busqueda = source === 'amazon'
+                ? await buscarPorTextoAmazon(query, { page })
+                : await buscarPorTextoShein(query, { sort: ORDEN_SHEIN[orden], minPrecio: minOrigen, maxPrecio: maxOrigen, page });
+            guardarCache(claveCache, busqueda);
+        }
 
         // El precio real y definitivo se recalcula server-side al hacer /api/search + /api/carrito.
         let resultados = busqueda.resultados.map((r, i) => ({ ...enriquecer(r), posicion: (page - 1) * 1000 + i }));

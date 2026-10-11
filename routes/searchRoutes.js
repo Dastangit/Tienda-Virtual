@@ -15,7 +15,7 @@ const { protect } = require('../middleware/authMiddleware');
 const porUsuario = (req) => String(req.user._id);
 const esAdmin = (req) => req.user?.role === 'admin';
 
-// Palabra clave: SIEMPRE cuesta un crédito (no se cachea).
+// Palabra clave: cuesta un crédito salvo que la misma búsqueda esté en el caché en memoria (10 min); el tope cuenta ambas.
 const keywordLimiter = rateLimit({
     windowMs: 10 * 60 * 1000,
     limit: 20,

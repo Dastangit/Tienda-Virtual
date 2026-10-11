@@ -5,6 +5,8 @@ const API = '';
 const TOKEN_KEY = 'tv_token';
 const ROLE_KEY = 'tv_role';
 const MAX_MODAL_PHOTOS = 5;
+// Con el filtro de valoracion activo (por defecto), se exige ademas este minimo de resenas.
+const MIN_RESENAS = 10;
 // A dónde va el cliente a coordinar el pago cuando su pedido está "Listo para pagar".
 // Cambia esta URL si prefieres otro canal.
 const PAYMENT_CONTACT_URL = 'https://wa.me/16055003653';
@@ -15,7 +17,7 @@ const state = {
   source: 'amazon',
   results: [],      // resultados cargados de la ultima busqueda (todas las paginas)
   lastSearch: null, // { query, source, sort, minPrice, maxPrice, page, hayMas }
-  filters: { sets: false, minPieces: 0, rating4: false, discount: false, category: '' },  modalItem: null, // { originalId, source } del producto que esta abierto en el modal
+  filters: { sets: false, minPieces: 0, rating4: true, discount: false, category: '' },  modalItem: null, // { originalId, source } del producto que esta abierto en el modal
   modalSize: null, // talla elegida en el modal (si el producto maneja tallas)
 };
 
@@ -187,7 +189,7 @@ function sortResults(list, sort) {
   const price = (a, b) => a.precioFinalCliente - b.precioFinalCliente;
   const arr = [...list];
   if (sort === 'cheapest') return arr.sort(price);
-  if (sort === 'unit') return arr.sort((a, b) => (a.precioUnidadCliente - b.precioUnidadCliente) || price(a, b));
+  if (sort === 'unit') return arr.sort((a, b) => (Number(a.cantidadDesconocida) - Number(b.cantidadDesconocida)) || (a.precioUnidadCliente - b.precioUnidadCliente) || price(a, b));
   if (sort === 'rated') return arr.sort((a, b) => (b.rating - a.rating) || (b.reviews - a.reviews));
   return arr.sort((a, b) => a.posicion - b.posicion); // mas vendidos / relevancia: orden de la tienda
 }
@@ -270,7 +272,7 @@ function visibleResults() {
   return state.results.filter(r =>
     (!f.sets || r.esSet) &&
     (!f.minPieces || r.piezas >= f.minPieces) &&
-    (!f.rating4 || r.rating >= 4) &&
+    (!f.rating4 || (r.rating >= 4 && r.reviews >= MIN_RESENAS)) &&
     (!f.discount || r.discountPercent > 0) &&
     (!f.category || r.category === f.category)
   );
@@ -354,7 +356,7 @@ function renderSearchResults() {
     card.className = 'result-item';
     const setBadge = item.esSet ? `<span class="badge badge-set">${item.piezas > 1 ? `Set x${item.piezas}` : 'Set'}</span>` : '';
     const discBadge = item.discountPercent > 0 ? `<span class="badge badge-discount">-${item.discountPercent}%</span>` : '';
-    const unit = item.piezas > 1 ? `<span class="result-item-unit">${money(item.precioUnidadCliente)} c/u</span>` : '';
+    const unit = item.piezas > 1 ? `<span class="result-item-unit">${money(item.precioUnidadCliente)} c/u</span>` : (item.cantidadDesconocida ? `<span class="result-item-unit">Cantidad no indicada</span>` : '');
     const rating = item.rating > 0 ? `<span class="result-item-rating">★ ${Number(item.rating).toFixed(1)}${item.reviews ? ` (${formatCount(item.reviews)})` : ''}</span>` : '';
     const tag = item.badge ? `<span class="result-item-tag">${escapeHtml(item.badge)}</span>` : '';
     card.innerHTML = `
