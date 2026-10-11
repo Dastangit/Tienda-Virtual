@@ -78,11 +78,53 @@
             <input type="text" id="searchInput" placeholder="audífonos inalámbricos" required>
             <button type="submit" class="btn btn-primary">Buscar</button>
           </div>
+          <div class="filter-grid">
+            <label class="filter-field">Ordenar por
+              <select id="sortSelect">
+                <option value="cheapest" selected>Más baratos</option>
+                <option value="unit">Mejor precio por pieza</option>
+                <option value="popular">Más vendidos</option>
+                <option value="rated">Mejor valorados</option>
+                <option value="relevance">Relevancia</option>
+              </select>
+            </label>
+            <label class="filter-field">Precio mín. ($)
+              <input type="number" id="minPrice" min="0" step="1" inputmode="decimal" placeholder="0">
+            </label>
+            <label class="filter-field">Precio máx. ($)
+              <input type="number" id="maxPrice" min="0" step="1" inputmode="decimal" placeholder="Sin límite">
+            </label>
+          </div>
+          <p class="filter-hint">Mostramos primero lo más barato. El rango de precio se aplica al buscar; los demás filtros aparecen con los resultados.</p>
           <p class="form-error" data-error-for="searchForm"></p>
         </form>
 
+        <div id="resultFilters" class="result-filters" hidden>
+          <div class="chip-row">
+            <button type="button" class="chip" id="fSets">Solo sets / multipiezas</button>
+            <button type="button" class="chip" id="fRating">4★ o más</button>
+            <button type="button" class="chip" id="fDiscount">Con descuento</button>
+          </div>
+          <div class="filter-grid filter-grid-inline">
+            <label class="filter-field">Mín. de piezas
+              <select id="fMinPieces">
+                <option value="0">Cualquiera</option>
+                <option value="2">2 o más</option>
+                <option value="3">3 o más</option>
+                <option value="5">5 o más</option>
+                <option value="10">10 o más</option>
+              </select>
+            </label>
+            <label class="filter-field" id="fCategoryWrap" hidden>Categoría
+              <select id="fCategory"><option value="">Todas</option></select>
+            </label>
+            <button type="button" class="chip chip-clear" id="fClear" hidden>Limpiar filtros</button>
+          </div>
+        </div>
+
         <p id="resultsCount" class="results-count" hidden></p>
         <div id="searchResults" class="results-grid" hidden></div>
+        <div class="load-more-wrap"><button type="button" id="loadMoreBtn" class="btn btn-ghost" hidden>Cargar más resultados</button></div>
       </div>
 
       <div class="steps">

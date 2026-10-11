@@ -1,5 +1,6 @@
 const ProductCache = require('../models/ProductCache');
-const { calcularPrecioFinal } = require('../utils/pricing');
+const { calcularPrecioFinal, precioOrigenDesdeFinal } = require('../utils/pricing');
+const { detectarPaquete } = require('../utils/productParser');
 
 // --- CONEXIÓN CON APIs EXTERNAS REALES ---
 
@@ -109,12 +110,27 @@ const obtenerProductoShein = async (productUrl) => {
 
 // 3. Búsqueda por PALABRA CLAVE en Amazon (Scrapingdog Amazon Search API)
 //    Devuelve una lista liviana de candidatos, sin cachear todavía.
-const buscarPorTextoAmazon = async (query) => {
+// Orden elegido en la UI -> orden que se le pide a Shein (Omkar). El resto (precio por
+// pieza, valoracion) se aplica aqui mismo sobre los resultados ya traidos.
+const ORDENES = ['cheapest', 'unit', 'popular', 'rated', 'relevance'];
+const ORDEN_SHEIN = {
+    cheapest: 'price_low_to_high',
+    unit: 'price_low_to_high',
+    popular: 'most_popular',
+    rated: 'most_popular',
+    relevance: 'recommend'
+};
+const MAX_PAGINAS = 10;
+const MAX_PAGINAS_AMAZON = 5;
+
+// 3. Busqueda por PALABRA CLAVE en Amazon (Scrapingdog Amazon Search API).
+//    Una llamada trae ~48 productos (mismo costo que antes, cuando solo usabamos 12).
+const buscarPorTextoAmazon = async (query, { page = 1 } = {}) => {
     const params = new URLSearchParams({
         api_key: process.env.SCRAPINGDOG_API_KEY,
         domain: 'com',
         query,
-        page: '1'
+        page: String(page)
     });
 
     const response = await fetchConReintento(`https://api.scrapingdog.com/amazon/search?${params.toString()}`);
@@ -124,21 +140,36 @@ const buscarPorTextoAmazon = async (query) => {
     const data = await response.json();
     const items = data.results || [];
 
-    return items
-        .filter(item => item.asin && (item.extracted_price || item.price))
-        .slice(0, 12)
-        .map(item => ({
-            originalId: item.asin,
-            source: 'amazon',
-            title: item.title,
-            price: item.extracted_price ?? extraerPrecioTexto(item.price),
-            image: item.image
-        }));
+    // Solo mapeamos campos concretos: la respuesta cruda de Scrapingdog trae enlaces con la API key.
+    const resultados = items
+        .filter(item => item.asin && !item.sponsored && (item.extracted_price || item.price))
+        .map(item => {
+            const price = item.extracted_price ?? extraerPrecioTexto(item.price);
+            const viejo = item.extracted_old_price;
+            return {
+                originalId: item.asin,
+                source: 'amazon',
+                title: item.title,
+                price,
+                image: item.image,
+                rating: typeof item.rating === 'number' ? item.rating : (parseFloat(item.stars) || 0),
+                reviews: typeof item.reviews === 'number' ? item.reviews : 0,
+                discountPercent: viejo && viejo > price ? Math.round((1 - price / viejo) * 100) : 0,
+                category: '',
+                badge: item.is_best_seller ? 'Más vendido' : (item.is_amazon_choice ? "Amazon's Choice" : '')
+            };
+        })
+        .filter(r => Number.isFinite(r.price) && r.price > 0);
+
+    return { resultados, hayMas: items.length >= 20 && page < MAX_PAGINAS_AMAZON, totalPaginas: null, total: null };
 };
 
-// 4. Búsqueda por PALABRA CLAVE en Shein (Omkar Cloud, mismo proveedor que el detalle)
-const buscarPorTextoShein = async (query) => {
-    const params = new URLSearchParams({ query, country: 'US' });
+// 4. Busqueda por PALABRA CLAVE en Shein (Omkar Cloud, mismo proveedor que el detalle).
+//    Una llamada trae hasta 120 productos y acepta orden y rango de precio nativos.
+const buscarPorTextoShein = async (query, { sort = 'recommend', minPrecio = null, maxPrecio = null, page = 1 } = {}) => {
+    const params = new URLSearchParams({ query, country: 'US', sort, page: String(page) });
+    if (minPrecio) params.set('min_price', String(minPrecio));
+    if (maxPrecio) params.set('max_price', String(maxPrecio));
 
     const response = await fetchConReintento(`https://shein-scraper.omkar.cloud/shein/search/products?${params.toString()}`, {
         headers: { 'API-Key': process.env.OMKAR_SHEIN_API_KEY }
@@ -149,16 +180,59 @@ const buscarPorTextoShein = async (query) => {
     const data = await response.json();
     const items = data.results || [];
 
-    return items
-        .filter(item => item.link && item.pricing?.sale_price?.amount)
-        .slice(0, 12)
+    const resultados = items
+        .filter(item => item.link && item.pricing?.sale_price?.amount && item.in_stock !== false)
         .map(item => ({
             originalId: item.link,
             source: 'shein',
             title: item.name,
             price: item.pricing.sale_price.amount,
-            image: item.image
+            image: item.image,
+            rating: item.rating || 0,
+            reviews: item.reviews_count || 0,
+            discountPercent: item.pricing.discount_percent || 0,
+            category: item.category?.name || '',
+            badge: ''
         }));
+
+    const totalPaginas = Math.min(data.total_pages || 1, MAX_PAGINAS);
+    return { resultados, hayMas: page < totalPaginas, totalPaginas, total: data.count ?? null };
+};
+
+// Completa cada resultado con lo que ve el cliente: precio con margen, piezas del set y
+// precio por pieza. A proposito NO devolvemos el precio de origen (oculta el margen).
+const enriquecer = (r) => {
+    const { piezas, esSet } = detectarPaquete(r.title);
+    const precioFinalCliente = calcularPrecioFinal(r.price);
+    return {
+        originalId: r.originalId,
+        source: r.source,
+        title: r.title,
+        image: r.image,
+        rating: r.rating || 0,
+        reviews: r.reviews || 0,
+        discountPercent: r.discountPercent || 0,
+        category: r.category || '',
+        badge: r.badge || '',
+        piezas,
+        esSet,
+        precioFinalCliente,
+        precioUnidadCliente: parseFloat((precioFinalCliente / piezas).toFixed(2))
+    };
+};
+
+const ordenar = (lista, orden) => {
+    const porPrecio = (a, b) => a.precioFinalCliente - b.precioFinalCliente;
+    if (orden === 'cheapest') return [...lista].sort(porPrecio);
+    if (orden === 'unit') return [...lista].sort((a, b) => (a.precioUnidadCliente - b.precioUnidadCliente) || porPrecio(a, b));
+    if (orden === 'rated') return [...lista].sort((a, b) => (b.rating - a.rating) || (b.reviews - a.reviews));
+    return lista; // popular / relevance: se respeta el orden que trae la tienda
+};
+
+const aPrecio = (v) => {
+    if (v === undefined || v === null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
 };
 // ------------------------------------
 
@@ -235,24 +309,47 @@ const searchByKeyword = async (req, res) => {
         if (!query || !source) {
             return res.status(400).json({ error: 'Se requiere query y source' });
         }
-
-        let resultados;
-        if (source === 'amazon') {
-            resultados = await buscarPorTextoAmazon(query);
-        } else if (source === 'shein') {
-            resultados = await buscarPorTextoShein(query);
-        } else {
+        if (source !== 'amazon' && source !== 'shein') {
             return res.status(400).json({ error: 'Fuente no soportada. Usa "amazon" o "shein".' });
         }
 
-        // Le aplicamos el margen a cada resultado solo para MOSTRAR el precio al cliente.
-        // El precio real y definitivo se recalcula server-side al hacer /api/search + /api/carrito.
-        const conMargen = resultados.map(r => ({
-            ...r,
-            precioFinalCliente: calcularPrecioFinal(r.price)
-        }));
+        // Filtros opcionales. Los precios que manda el cliente son los que EL ve (con margen).
+        const orden = ORDENES.includes(req.body.sort) ? req.body.sort : 'cheapest';
+        const page = Math.min(Math.max(parseInt(req.body.page, 10) || 1, 1), MAX_PAGINAS);
+        const minCliente = aPrecio(req.body.minPrice);
+        const maxCliente = aPrecio(req.body.maxPrice);
+        if (minCliente && maxCliente && minCliente > maxCliente) {
+            return res.status(400).json({ error: 'El precio mínimo no puede ser mayor que el máximo' });
+        }
 
-        res.json({ resultados: conMargen });
+        // Traducimos el rango del cliente a precio de origen para que Shein filtre de su lado.
+        // Shein solo acepta enteros. El maximo se redondea hacia arriba (holgado) y abajo se
+        // recorta exacto con el precio final. El minimo, cuando se ordena por precio ascendente,
+        // tambien hacia arriba: si no, la primera pagina se llena de productos justo por debajo
+        // del minimo y quedaria vacia tras el recorte.
+        const ascendente = ORDEN_SHEIN[orden] === 'price_low_to_high';
+        const minExacto = minCliente ? precioOrigenDesdeFinal(minCliente) : null;
+        const minOrigen = minExacto ? (ascendente ? Math.ceil(minExacto) : Math.floor(minExacto)) : null;
+        const maxOrigen = maxCliente ? Math.ceil(precioOrigenDesdeFinal(maxCliente)) : null;
+
+        const busqueda = source === 'amazon'
+            ? await buscarPorTextoAmazon(query, { page })
+            : await buscarPorTextoShein(query, { sort: ORDEN_SHEIN[orden], minPrecio: minOrigen, maxPrecio: maxOrigen, page });
+
+        // El precio real y definitivo se recalcula server-side al hacer /api/search + /api/carrito.
+        let resultados = busqueda.resultados.map((r, i) => ({ ...enriquecer(r), posicion: (page - 1) * 1000 + i }));
+        if (minCliente) resultados = resultados.filter(r => r.precioFinalCliente >= minCliente);
+        if (maxCliente) resultados = resultados.filter(r => r.precioFinalCliente <= maxCliente);
+        resultados = ordenar(resultados, orden);
+
+        res.json({
+            resultados,
+            orden,
+            pagina: page,
+            hayMas: busqueda.hayMas,
+            totalPaginas: busqueda.totalPaginas,
+            total: busqueda.total
+        });
     } catch (error) {
         console.error('❌ Error en la búsqueda por texto:', error.message);
         const esProveedorExterno = /Scrapingdog respondió|Omkar Cloud|no respondió a tiempo/.test(error.message);
@@ -261,5 +358,4 @@ const searchByKeyword = async (req, res) => {
         });
     }
 };
-
 module.exports = { searchProduct, searchByKeyword, obtenerProductoAmazon, obtenerProductoShein };

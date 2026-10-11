@@ -13,7 +13,9 @@ const state = {
   token: localStorage.getItem(TOKEN_KEY) || null,
   role: localStorage.getItem(ROLE_KEY) || null,
   source: 'amazon',
-  modalItem: null, // { originalId, source } del producto que esta abierto en el modal
+  results: [],      // resultados cargados de la ultima busqueda (todas las paginas)
+  lastSearch: null, // { query, source, sort, minPrice, maxPrice, page, hayMas }
+  filters: { sets: false, minPieces: 0, rating4: false, discount: false, category: '' },  modalItem: null, // { originalId, source } del producto que esta abierto en el modal
   modalSize: null, // talla elegida en el modal (si el producto maneja tallas)
 };
 
@@ -156,76 +158,227 @@ function onLoggedIn() {
   refreshCartCount();
 }
 
-// ---------- search (por palabra clave) ----------
+// ---------- search (por palabra clave, con filtros) ----------
+// Cada busqueda cuesta 1 credito y trae muchos productos (Shein hasta 120). Los filtros de
+// abajo (sets, piezas, valoracion, descuento, categoria) se aplican aqui, GRATIS, sobre lo ya
+// cargado. El rango de precio y el orden de Shein si viajan al servidor al buscar.
+const SORT_GROUP = { cheapest: 'precio', unit: 'precio', popular: 'popular', rated: 'popular', relevance: 'relevancia' };
+const NO_FILTERS = { sets: false, minPieces: 0, rating4: false, discount: false, category: '' };
+
 $all('.source-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     $all('.source-btn').forEach(b => b.classList.remove('is-active'));
     btn.classList.add('is-active');
     state.source = btn.dataset.source;
-    $('#searchResults').hidden = true;
-    $('#resultsCount').hidden = true;
+    resetSearchResults();
   });
 });
 
-$('#searchForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setError('searchForm', '');
-  const query = $('#searchInput').value.trim();
-  if (!query) return;
-
-  const submitBtn = e.target.querySelector('button[type="submit"]');
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Buscando…';
+function resetSearchResults() {
+  state.results = [];
+  state.lastSearch = null;
   $('#searchResults').hidden = true;
   $('#resultsCount').hidden = true;
+  $('#resultFilters').hidden = true;
+  $('#loadMoreBtn').hidden = true;
+}
+
+function sortResults(list, sort) {
+  const price = (a, b) => a.precioFinalCliente - b.precioFinalCliente;
+  const arr = [...list];
+  if (sort === 'cheapest') return arr.sort(price);
+  if (sort === 'unit') return arr.sort((a, b) => (a.precioUnidadCliente - b.precioUnidadCliente) || price(a, b));
+  if (sort === 'rated') return arr.sort((a, b) => (b.rating - a.rating) || (b.reviews - a.reviews));
+  return arr.sort((a, b) => a.posicion - b.posicion); // mas vendidos / relevancia: orden de la tienda
+}
+
+async function runSearch({ append = false } = {}) {
+  setError('searchForm', '');
+  const prev = state.lastSearch;
+  const params = append && prev ? { query: prev.query, source: prev.source, sort: prev.sort, minPrice: prev.minPrice, maxPrice: prev.maxPrice } : {
+    query: $('#searchInput').value.trim(),
+    source: state.source,
+    sort: $('#sortSelect').value,
+    minPrice: $('#minPrice').value,
+    maxPrice: $('#maxPrice').value,
+  };
+  if (!params.query) return;
+  const page = append && prev ? prev.page + 1 : 1;
+
+  const submitBtn = $('#searchForm button[type="submit"]');
+  const moreBtn = $('#loadMoreBtn');
+  submitBtn.disabled = true;
+  moreBtn.disabled = true;
+  if (append) {
+    moreBtn.textContent = 'Cargando…';
+  } else {
+    submitBtn.textContent = 'Buscando…';
+    $('#searchResults').hidden = true;
+    $('#resultsCount').hidden = true;
+    $('#resultFilters').hidden = true;
+    moreBtn.hidden = true;
+  }
 
   try {
-    const data = await api('/api/search/query', {
-      method: 'POST',
-      body: JSON.stringify({ query, source: state.source })
-    });
-    renderSearchResults(data.resultados || []);
+    const data = await api('/api/search/query', { method: 'POST', body: JSON.stringify({ ...params, page }) });
+    const nuevos = data.resultados || [];
+    if (append) {
+      const vistos = new Set(state.results.map(r => r.originalId));
+      state.results = state.results.concat(nuevos.filter(r => !vistos.has(r.originalId)));
+    } else {
+      state.results = nuevos;
+      state.filters.category = '';
+    }
+    state.lastSearch = { ...params, page, hayMas: !!data.hayMas };
+    state.results = sortResults(state.results, params.sort);
+    buildCategoryOptions();
+    renderSearchResults();
   } catch (err) {
     setError('searchForm', err.message);
+    if (append) { moreBtn.disabled = false; moreBtn.textContent = 'Cargar más resultados'; }
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Buscar';
   }
+}
+
+$('#searchForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  runSearch();
 });
 
-function renderSearchResults(resultados) {
+$('#loadMoreBtn').addEventListener('click', () => runSearch({ append: true }));
+
+// Cambiar el orden: si Shein tiene que traer otro "grupo" de resultados (ej. de baratos a
+// mas vendidos) se vuelve a buscar; si no, se reordena lo ya cargado sin gastar nada.
+$('#sortSelect').addEventListener('change', () => {
+  const ls = state.lastSearch;
+  if (!ls) return;
+  const nuevo = $('#sortSelect').value;
+  if (ls.source === 'shein' && SORT_GROUP[nuevo] !== SORT_GROUP[ls.sort]) {
+    runSearch();
+    return;
+  }
+  ls.sort = nuevo;
+  state.results = sortResults(state.results, nuevo);
+  renderSearchResults();
+});
+
+// ----- filtros sobre los resultados cargados -----
+function visibleResults() {
+  const f = state.filters;
+  return state.results.filter(r =>
+    (!f.sets || r.esSet) &&
+    (!f.minPieces || r.piezas >= f.minPieces) &&
+    (!f.rating4 || r.rating >= 4) &&
+    (!f.discount || r.discountPercent > 0) &&
+    (!f.category || r.category === f.category)
+  );
+}
+
+function activeFilterCount() {
+  const f = state.filters;
+  return [f.sets, f.minPieces, f.rating4, f.discount, f.category].filter(Boolean).length;
+}
+
+function buildCategoryOptions() {
+  const counts = {};
+  state.results.forEach(r => { if (r.category) counts[r.category] = (counts[r.category] || 0) + 1; });
+  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const sel = $('#fCategory');
+  sel.innerHTML = '';
+  sel.add(new Option('Todas', ''));
+  names.forEach(n => sel.add(new Option(`${n} (${counts[n]})`, n)));
+  if (!names.includes(state.filters.category)) state.filters.category = '';
+  sel.value = state.filters.category;
+  $('#fCategoryWrap').hidden = names.length < 2;
+}
+
+function syncFilterControls() {
+  const f = state.filters;
+  $('#fSets').classList.toggle('is-active', f.sets);
+  $('#fRating').classList.toggle('is-active', f.rating4);
+  $('#fDiscount').classList.toggle('is-active', f.discount);
+  $('#fMinPieces').value = String(f.minPieces);
+  $('#fClear').hidden = activeFilterCount() === 0;
+}
+
+$('#fSets').addEventListener('click', () => { state.filters.sets = !state.filters.sets; renderSearchResults(); });
+$('#fRating').addEventListener('click', () => { state.filters.rating4 = !state.filters.rating4; renderSearchResults(); });
+$('#fDiscount').addEventListener('click', () => { state.filters.discount = !state.filters.discount; renderSearchResults(); });
+$('#fMinPieces').addEventListener('change', (e) => { state.filters.minPieces = Number(e.target.value); renderSearchResults(); });
+$('#fCategory').addEventListener('change', (e) => { state.filters.category = e.target.value; renderSearchResults(); });
+$('#fClear').addEventListener('click', () => {
+  state.filters = { ...NO_FILTERS };
+  $('#fCategory').value = '';
+  renderSearchResults();
+});
+
+function formatCount(n) {
+  if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k';
+  return String(n);
+}
+
+function renderSearchResults() {
   const grid = $('#searchResults');
   const count = $('#resultsCount');
+  const moreBtn = $('#loadMoreBtn');
   grid.innerHTML = '';
 
-  if (resultados.length === 0) {
+  const total = state.results.length;
+  if (total === 0) {
     count.hidden = false;
-    count.textContent = 'No encontramos productos para esa búsqueda. Prueba con otras palabras.';
+    count.textContent = 'No encontramos productos para esa búsqueda. Prueba con otras palabras o amplía el rango de precio.';
     grid.hidden = true;
+    $('#resultFilters').hidden = true;
+    moreBtn.hidden = true;
     return;
   }
 
-  count.hidden = false;
-  count.textContent = `${resultados.length} resultados — toca uno para ver más fotos`;
+  const visibles = visibleResults();
+  $('#resultFilters').hidden = false;
+  syncFilterControls();
 
-  resultados.forEach(item => {
+  count.hidden = false;
+  if (visibles.length === 0) {
+    count.textContent = `Ningún producto cumple tus filtros (${total} cargados). Quita alguno o carga más resultados.`;
+  } else if (activeFilterCount() > 0) {
+    count.textContent = `${visibles.length} de ${total} resultados con tus filtros — toca uno para ver más fotos`;
+  } else {
+    count.textContent = `${total} resultados — toca uno para ver más fotos`;
+  }
+
+  visibles.forEach(item => {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'result-item';
+    const setBadge = item.esSet ? `<span class="badge badge-set">${item.piezas > 1 ? `Set x${item.piezas}` : 'Set'}</span>` : '';
+    const discBadge = item.discountPercent > 0 ? `<span class="badge badge-discount">-${item.discountPercent}%</span>` : '';
+    const unit = item.piezas > 1 ? `<span class="result-item-unit">${money(item.precioUnidadCliente)} c/u</span>` : '';
+    const rating = item.rating > 0 ? `<span class="result-item-rating">★ ${Number(item.rating).toFixed(1)}${item.reviews ? ` (${formatCount(item.reviews)})` : ''}</span>` : '';
+    const tag = item.badge ? `<span class="result-item-tag">${escapeHtml(item.badge)}</span>` : '';
     card.innerHTML = `
-      <img src="${item.image || ''}" alt="" loading="lazy">
+      <div class="result-media">
+        <img src="${item.image || ''}" alt="" loading="lazy">
+        ${setBadge}${discBadge}
+      </div>
       <div class="result-item-body">
         <p class="result-item-title">${escapeHtml(item.title)}</p>
+        ${tag}
         <span class="result-item-price">${money(item.precioFinalCliente)}</span>
+        ${unit}
+        ${rating}
       </div>
     `;
     card.addEventListener('click', () => openProductModal(item));
     grid.appendChild(card);
   });
 
-  grid.hidden = false;
+  grid.hidden = visibles.length === 0;
+  moreBtn.hidden = !state.lastSearch?.hayMas;
+  moreBtn.disabled = false;
+  moreBtn.textContent = 'Cargar más resultados';
 }
-
 // ---------- product modal (galeria de hasta 5 fotos) ----------
 function renderModalGallery(fotos) {
   $('#modalGallery').innerHTML = fotos

@@ -8,4 +8,8 @@ const calcularPrecioFinal = (precioOriginal) => {
     return parseFloat((precioOriginal + ganancia).toFixed(2));
 };
 
-module.exports = { calcularPrecioFinal, MARGEN_PROXY };
+// Inverso de calcularPrecioFinal: dado el precio que ve el cliente, devuelve el precio de
+// origen equivalente. Sirve para traducir los filtros de precio del cliente a la tienda.
+const precioOrigenDesdeFinal = (precioFinal) => precioFinal / (1 + MARGEN_PROXY);
+
+module.exports = { calcularPrecioFinal, precioOrigenDesdeFinal, MARGEN_PROXY };
