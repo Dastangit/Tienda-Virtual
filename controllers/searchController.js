@@ -2,6 +2,11 @@ const ProductCache = require('../models/ProductCache');
 const { calcularPrecioFinal, precioOrigenDesdeFinal } = require('../utils/pricing');
 const { detectarPaquete } = require('../utils/productParser');
 
+// Idioma de los resultados: todos los clientes hablan espanol. Shein usa la tienda de EE.UU. en espanol
+// (precios en USD) y Amazon la version es_US, que traduce los titulos que el vendedor tiene en espanol.
+const IDIOMA_SHEIN = 'es';
+const IDIOMA_AMAZON = 'es_US';
+
 // --- CONEXIÓN CON APIs EXTERNAS REALES ---
 
 // fetch nativo de Node a veces falla con "fetch failed" por un hipo de red
@@ -54,7 +59,8 @@ const obtenerProductoAmazon = async (asin) => {
     const params = new URLSearchParams({
         api_key: process.env.SCRAPINGDOG_API_KEY,
         domain: 'com',
-        asin
+        asin,
+        language: IDIOMA_AMAZON
     });
 
     const response = await fetchConReintento(`https://api.scrapingdog.com/amazon/product?${params.toString()}`);
@@ -80,7 +86,7 @@ const obtenerProductoAmazon = async (asin) => {
 // 2. Shein vía Omkar Cloud (API dedicada a Shein, con lookup exacto por producto)
 //    originalId debe ser la URL completa del producto en Shein (o su goods_id numérico)
 const obtenerProductoShein = async (productUrl) => {
-    const params = new URLSearchParams({ product: productUrl });
+    const params = new URLSearchParams({ product: productUrl, language: IDIOMA_SHEIN });
 
     const response = await fetchConReintento(`https://shein-scraper.omkar.cloud/shein/products/details?${params.toString()}`, {
         headers: { 'API-Key': process.env.OMKAR_SHEIN_API_KEY }
@@ -159,6 +165,7 @@ const buscarPorTextoAmazon = async (query, { page = 1 } = {}) => {
         api_key: process.env.SCRAPINGDOG_API_KEY,
         domain: 'com',
         query,
+        language: IDIOMA_AMAZON,
         page: String(page)
     });
 
@@ -196,7 +203,7 @@ const buscarPorTextoAmazon = async (query, { page = 1 } = {}) => {
 // 4. Busqueda por PALABRA CLAVE en Shein (Omkar Cloud, mismo proveedor que el detalle).
 //    Una llamada trae hasta 120 productos y acepta orden y rango de precio nativos.
 const buscarPorTextoShein = async (query, { sort = 'recommend', minPrecio = null, maxPrecio = null, page = 1 } = {}) => {
-    const params = new URLSearchParams({ query, country: 'US', sort, page: String(page) });
+    const params = new URLSearchParams({ query, country: 'US', language: IDIOMA_SHEIN, sort, page: String(page) });
     if (minPrecio) params.set('min_price', String(minPrecio));
     if (maxPrecio) params.set('max_price', String(maxPrecio));
 
@@ -364,8 +371,8 @@ const searchByKeyword = async (req, res) => {
 
         const texto = String(query).trim().toLowerCase();
         const claveCache = source === 'amazon'
-            ? `amazon|${texto}|${page}`
-            : `shein|${texto}|${ORDEN_SHEIN[orden]}|${minOrigen || ''}|${maxOrigen || ''}|${page}`;
+            ? `amazon|${IDIOMA_AMAZON}|${texto}|${page}`
+            : `shein|${IDIOMA_SHEIN}|${texto}|${ORDEN_SHEIN[orden]}|${minOrigen || ''}|${maxOrigen || ''}|${page}`;
         let busqueda = leerCache(claveCache);
         if (!busqueda) {
             busqueda = source === 'amazon'
