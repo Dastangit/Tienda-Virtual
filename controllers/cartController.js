@@ -21,7 +21,7 @@ const agregarAlCarrito = async (req, res) => {
     try {
         const { originalId, source, size, color } = req.body;
 
-        if (!originalId || !source) {
+        if (typeof originalId !== 'string' || typeof source !== 'string' || !originalId || !source || originalId.length > 600) {
             return res.status(400).json({ error: 'Se requiere originalId y source' });
         }
 

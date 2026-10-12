@@ -43,9 +43,7 @@ function setError(formId, msg) {
 }
 
 function escapeHtml(str) {
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
+  return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 async function api(path, options = {}) {
@@ -185,13 +183,37 @@ function resetSearchResults() {
   $('#loadMoreBtn').hidden = true;
 }
 
-function sortResults(list, sort) {
+function ordenarLote(list, sort) {
   const price = (a, b) => a.precioFinalCliente - b.precioFinalCliente;
   const arr = [...list];
   if (sort === 'cheapest') return arr.sort(price);
   if (sort === 'unit') return arr.sort((a, b) => (Number(a.cantidadDesconocida) - Number(b.cantidadDesconocida)) || (a.precioUnidadCliente - b.precioUnidadCliente) || price(a, b));
   if (sort === 'rated') return arr.sort((a, b) => (b.rating - a.rating) || (b.reviews - a.reviews));
   return arr.sort((a, b) => a.posicion - b.posicion); // mas vendidos / relevancia: orden de la tienda
+}
+
+// Cada "Cargar mas" agrega un lote nuevo AL FINAL de la lista (ordenado por dentro con el criterio
+// elegido). Asi lo nuevo siempre se ve abajo y no se mezcla con lo ya visto: las paginas de Shein
+// por precio se solapan y empiezan otra vez por los mas baratos.
+function sortResults(list, sort) {
+  const porLote = new Map();
+  list.forEach(r => {
+    const l = r.lote || 1;
+    if (!porLote.has(l)) porLote.set(l, []);
+    porLote.get(l).push(r);
+  });
+  return [...porLote.keys()].sort((a, b) => a - b).flatMap(l => ordenarLote(porLote.get(l), sort));
+}
+
+// Avisa cuantos productos nuevos llegaron y lleva la vista hasta el primero.
+function anunciarNuevos(agregados) {
+  if (agregados.length === 0) { toast('No hay productos nuevos en esta página'); return; }
+  const ids = new Set(agregados.map(r => r.originalId));
+  const visiblesNuevos = visibleResults().filter(r => ids.has(r.originalId));
+  if (visiblesNuevos.length === 0) { toast(`Se cargaron ${agregados.length} productos, pero tus filtros los ocultan`); return; }
+  toast(`${visiblesNuevos.length} productos nuevos al final de la lista`);
+  const card = $all('#searchResults .result-item').find(c => c.dataset.id === visiblesNuevos[0].originalId);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function runSearch({ append = false } = {}) {
@@ -224,17 +246,21 @@ async function runSearch({ append = false } = {}) {
   try {
     const data = await api('/api/search/query', { method: 'POST', body: JSON.stringify({ ...params, page }) });
     const nuevos = data.resultados || [];
+    let agregados = [];
     if (append) {
       const vistos = new Set(state.results.map(r => r.originalId));
-      state.results = state.results.concat(nuevos.filter(r => !vistos.has(r.originalId)));
+      agregados = nuevos.filter(r => !vistos.has(r.originalId)).map(r => ({ ...r, lote: page }));
+      state.results = state.results.concat(agregados);
     } else {
-      state.results = nuevos;
+      state.results = nuevos.map(r => ({ ...r, lote: 1 }));
       state.filters.category = '';
     }
-    state.lastSearch = { ...params, page, hayMas: !!data.hayMas };
+    // Si la pagina no trajo nada nuevo, no tiene sentido ofrecer cargar mas.
+    state.lastSearch = { ...params, page, hayMas: !!data.hayMas && !(append && agregados.length === 0) };
     state.results = sortResults(state.results, params.sort);
     buildCategoryOptions();
     renderSearchResults();
+    if (append) anunciarNuevos(agregados);
   } catch (err) {
     setError('searchForm', err.message);
     if (append) { moreBtn.disabled = false; moreBtn.textContent = 'Cargar más resultados'; }
@@ -354,6 +380,7 @@ function renderSearchResults() {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'result-item';
+    card.dataset.id = item.originalId;
     const setBadge = item.esSet ? `<span class="badge badge-set">${item.piezas > 1 ? `Set x${item.piezas}` : 'Set'}</span>` : '';
     const discBadge = item.discountPercent > 0 ? `<span class="badge badge-discount">-${item.discountPercent}%</span>` : '';
     const unit = item.piezas > 1 ? `<span class="result-item-unit">${money(item.precioUnidadCliente)} c/u</span>` : (item.cantidadDesconocida ? `<span class="result-item-unit">Cantidad no indicada</span>` : '');
@@ -361,7 +388,7 @@ function renderSearchResults() {
     const tag = item.badge ? `<span class="result-item-tag">${escapeHtml(item.badge)}</span>` : '';
     card.innerHTML = `
       <div class="result-media">
-        <img src="${item.image || ''}" alt="" loading="lazy">
+        <img src="${escapeHtml(item.image || '')}" alt="" loading="lazy">
         ${setBadge}${discBadge}
       </div>
       <div class="result-item-body">
@@ -384,7 +411,7 @@ function renderSearchResults() {
 // ---------- product modal (galeria de hasta 5 fotos) ----------
 function renderModalGallery(fotos) {
   $('#modalGallery').innerHTML = fotos
-    .map((src, i) => `<img src="${src}" alt="" loading="lazy" data-idx="${i}">`)
+    .map((src, i) => `<img src="${escapeHtml(src)}" alt="" loading="lazy" data-idx="${i}">`)
     .join('');
 
   $all('#modalGallery img').forEach(img => {
@@ -408,7 +435,7 @@ function renderModalColors(colors) {
   el.hidden = false;
   el.innerHTML = colors.map(c => `
     <button type="button" class="color-chip ${c.current ? 'is-active' : ''}" data-link="${escapeHtml(c.link)}" title="${escapeHtml(c.name)}">
-      <img src="${c.image}" alt="${escapeHtml(c.name)}" loading="lazy">
+      <img src="${escapeHtml(c.image)}" alt="${escapeHtml(c.name)}" loading="lazy">
     </button>
   `).join('');
 
@@ -571,7 +598,7 @@ async function renderCart() {
     const li = document.createElement('li');
     li.className = 'manifest-item';
     li.innerHTML = `
-      <img src="${item.image || ''}" alt="">
+      <img src="${escapeHtml(item.image || '')}" alt="">
       <div>
         <p class="manifest-item-title">${escapeHtml(item.title)}</p>
         <span class="manifest-item-price">${money(item.precioFinalCliente)} · ${item.source.toUpperCase()}${item.size ? ' · Talla ' + escapeHtml(item.size) : ''}${item.color ? ' · ' + escapeHtml(item.color) : ''}</span>
@@ -647,7 +674,7 @@ async function renderOrders() {
 
     const productosHtml = t.productos.map(p => `
       <div class="order-product">
-        <img src="${p.imagen || ''}" alt="" loading="lazy">
+        <img src="${escapeHtml(p.imagen || '')}" alt="" loading="lazy">
         <span class="order-product-title">${escapeHtml(p.titulo)}${p.talla ? ' · Talla ' + escapeHtml(p.talla) : ''}${p.color ? ' · ' + escapeHtml(p.color) : ''}</span>
         <span class="order-product-price">${money(p.precio)}</span>
       </div>

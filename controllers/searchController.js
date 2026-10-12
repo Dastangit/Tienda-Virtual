@@ -278,7 +278,7 @@ const searchProduct = async (req, res) => {
     try {
         const { originalId, source } = req.body;
 
-        if (!originalId || !source) {
+        if (typeof originalId !== 'string' || typeof source !== 'string' || !originalId || !source || originalId.length > 600) {
             return res.status(400).json({ error: 'Se requiere originalId y source' });
         }
 
@@ -345,6 +345,12 @@ const searchByKeyword = async (req, res) => {
 
         if (!query || !source) {
             return res.status(400).json({ error: 'Se requiere query y source' });
+        }
+        if (typeof query !== 'string' || typeof source !== 'string') {
+            return res.status(400).json({ error: 'query y source deben ser texto' });
+        }
+        if (query.trim().length > 120) {
+            return res.status(400).json({ error: 'La búsqueda es demasiado larga (máximo 120 caracteres)' });
         }
         if (source !== 'amazon' && source !== 'shein') {
             return res.status(400).json({ error: 'Fuente no soportada. Usa "amazon" o "shein".' });

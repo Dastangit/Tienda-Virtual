@@ -3,10 +3,13 @@
 // Sirve para mostrar "Set x5" y el precio por pieza, y para filtrar por cantidad.
 const UNIDADES = '(?:pcs?|pieces?|pack|packs|pairs?|prs?|sets?|units?|count|ct|rolls?|bags?|boxes|pieza|piezas|paquetes?|uds?|unidades?|pzas?|pares?|par|juegos?|conjuntos?|rollos?|bolsas?|cajas?)';
 
+const NUMEROS_TEXTO = { dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, doce: 12 };
+
 const PATRONES = [
     new RegExp('\\b(?:set|pack|lot|bundle|kit)\\s+of\\s+(\\d{1,3})\\b', 'i'),     // "Set of 5"
     new RegExp('\\b(\\d{1,3})\\s*-?\\s*' + UNIDADES + '\\b', 'i'),                 // "5pcs", "5-Piece", "10 Pack"
-    new RegExp('\\b(?:pack|set|lote|paquete|conjunto|juego|kit)\\s+(?:de\\s+)?(\\d{1,3})\\b', 'i')    // "Pack de 12"
+    new RegExp('\\b(?:pack|set|lote|paquete|conjunto|juego|kit)\\s+(?:de\\s+)?(\\d{1,3})\\b', 'i'),   // "Pack de 12"
+    new RegExp('\\b(dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce)\\s+' + UNIDADES + '\\b', 'i')   // "dos piezas"
 ];
 
 // Titulos que dicen "set / kit / combo" sin indicar cantidad: cuentan como set (piezas = 1).
@@ -18,7 +21,7 @@ const detectarPaquete = (titulo) => {
     for (const patron of PATRONES) {
         const m = patron.exec(texto);
         if (!m) continue;
-        const n = parseInt(m[1], 10);
+        const n = /^\d+$/.test(m[1]) ? parseInt(m[1], 10) : NUMEROS_TEXTO[m[1].toLowerCase()];
         if (n < 2 || n > 500) continue;
         if (!mejor || m.index < mejor.index) mejor = { n, index: m.index };
     }
