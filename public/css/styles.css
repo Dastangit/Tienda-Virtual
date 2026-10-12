@@ -55,7 +55,7 @@ body {
 }
 
 .wrap {
-  max-width: 720px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -292,8 +292,8 @@ a.btn { text-decoration: none; display: inline-block; text-align: center; }
 }
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
 }
 .result-item {
   display: flex;
@@ -825,4 +825,19 @@ input[type="number"]:focus, .filter-field select:focus { outline: 2px solid var(
   .filter-grid > .filter-field:first-child { grid-column: span 2; }
   .filter-grid-inline { grid-template-columns: 1fr 1fr; }
   .filter-grid-inline .chip-clear { grid-column: span 2; }
+}
+
+/* ===== escritorio: aprovechar el ancho de la pantalla ===== */
+/* El contenedor general ya ocupa hasta 1400px. Aqui se limita lo que no tiene sentido estirar
+   (formularios, carrito, historial, login) y se deja que resultados y servicios usen todo el ancho. */
+.search-form { max-width: 900px; }
+#view-auth { max-width: 520px; margin-left: auto; margin-right: auto; }
+#view-cart, #view-orders { max-width: 880px; margin-left: auto; margin-right: auto; }
+@media (min-width: 900px) {
+  .wrap { padding: 0 40px; }
+  .view { padding: 64px 0 88px; }
+  .result-item-title { font-size: 0.86rem; }
+  .modal { max-width: 560px; }
+  .filter-grid-inline { grid-template-columns: 240px 240px auto; }
+  .filter-grid-inline .chip-clear { justify-self: start; }
 }
