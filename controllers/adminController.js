@@ -1,43 +1,6 @@
 const Cart = require('../models/Cart');
-const User = require('../models/User');
 const { obtenerProductoAmazon, obtenerProductoShein } = require('./searchController');
 const { calcularPrecioFinal } = require('../utils/pricing');
-
-// Avisa al CLIENTE (vía un 2.º webhook de Make) que su total ya está listo para pagar.
-// Es opcional: si MAKE_WEBHOOK_CLIENTE_URL no está definida, no hace nada.
-// Nunca debe tumbar la petición del admin: solo se loguea el error. Timeout de 10s para
-// que un Make colgado no deje la promesa abierta.
-// Eventos que se envian en el campo evento: 'pendiente_pago' (total listo para pagar),
-// 'pagado' (pago confirmado) y 'completado' (pedido entregado). En Make se separan con un Router.
-const notificarCliente = async (carrito, evento) => {
-    if (!process.env.MAKE_WEBHOOK_CLIENTE_URL) return;
-
-    try {
-        const cliente = await User.findById(carrito.user).select('name phone');
-        const subtotal = carrito.items.reduce((acc, item) => acc + item.precioFinalCliente, 0);
-        const envio = carrito.costoEnvio || 0;
-
-        const res = await fetch(process.env.MAKE_WEBHOOK_CLIENTE_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(10000),
-            body: JSON.stringify({
-                evento,
-                carritoId: carrito._id.toString(),
-                numeroOrden: String(carrito._id).slice(-6),
-                cliente: cliente?.name || '',
-                telefono: cliente?.phone || '',
-                subtotal: parseFloat(subtotal.toFixed(2)),
-                envio: parseFloat(envio.toFixed(2)),
-                total: parseFloat((subtotal + envio).toFixed(2)),
-                listaProductos: carrito.items.map(i => `• ${i.title}`).join('\n')
-            })
-        });
-        if (!res.ok) console.error(`⚠️ Make (aviso al cliente) respondió ${res.status}`);
-    } catch (error) {
-        console.error('⚠️ No se pudo avisar al cliente vía Make:', error.message);
-    }
-};
 
 // 1. LISTAR CARRITOS POR ESTADO (por defecto "cotizando", pero admite ?status=pagado|completado)
 const obtenerCotizaciones = async (req, res) => {
@@ -86,8 +49,6 @@ const asignarCostoEnvio = async (req, res) => {
         carrito.status = 'pendiente_pago';
         await carrito.save();
 
-        // Aviso automático al cliente (no bloquea la respuesta al admin)
-        notificarCliente(carrito, 'pendiente_pago');
 
         res.json({
             mensaje: '📦 Costo de envío asignado. Esperando que el cliente pague.',
@@ -121,8 +82,6 @@ const confirmarPago = async (req, res) => {
         carrito.pagadoAt = new Date();
         await carrito.save();
 
-        // Aviso automatico al cliente (no bloquea la respuesta al admin)
-        notificarCliente(carrito, 'pagado');
 
         res.json({
             mensaje: '💰 Pago confirmado.',
@@ -153,8 +112,6 @@ const marcarCompletado = async (req, res) => {
         carrito.status = 'completado';
         await carrito.save();
 
-        // Aviso automatico al cliente (no bloquea la respuesta al admin)
-        notificarCliente(carrito, 'completado');
 
         res.json({
             mensaje: '✅ Pedido marcado como completado.',
