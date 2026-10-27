@@ -1,7 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const { obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas } = require('../controllers/adminController');
+const mongoose = require('mongoose');
 const { protect, admin } = require('../middleware/authMiddleware');
+
+// Un :id que no tiene forma de ObjectId haria fallar findById con error 500: respondemos 404.
+router.param('id', (req, res, next, id) => {
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(404).json({ error: 'Carrito no encontrado' });
+    }
+    next();
+});
 
 // GET /api/admin/stats -> resumen general: pedidos por estado, facturado/margen del mes, por cobrar
 router.get('/stats', protect, admin, obtenerEstadisticas);

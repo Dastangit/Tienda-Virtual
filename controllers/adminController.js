@@ -27,10 +27,12 @@ const obtenerCotizaciones = async (req, res) => {
 const asignarCostoEnvio = async (req, res) => {
     try {
         const { id } = req.params;
-        const { costoEnvio } = req.body;
-
-        if (costoEnvio === undefined || costoEnvio === null || Number(costoEnvio) < 0) {
-            return res.status(400).json({ error: 'Debes indicar un costoEnvio válido (número mayor o igual a 0)' });
+        // Number.isFinite descarta texto ("abc" -> NaN), vacios e Infinity; el tope evita un error de tipeo
+        // (ej. 1500 en vez de 15.00) que le mostraria al cliente un total absurdo.
+        const valor = req.body.costoEnvio;
+        const costoEnvio = typeof valor === 'number' || (typeof valor === 'string' && valor.trim() !== '') ? Number(valor) : NaN;
+        if (!Number.isFinite(costoEnvio) || costoEnvio < 0 || costoEnvio > 1000) {
+            return res.status(400).json({ error: 'Debes indicar un costoEnvio válido (número entre 0 y 1000)' });
         }
 
         const carrito = await Cart.findById(id);
@@ -45,7 +47,7 @@ const asignarCostoEnvio = async (req, res) => {
             });
         }
 
-        carrito.costoEnvio = costoEnvio;
+        carrito.costoEnvio = parseFloat(costoEnvio.toFixed(2));
         carrito.status = 'pendiente_pago';
         await carrito.save();
 
