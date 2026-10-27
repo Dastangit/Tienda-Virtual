@@ -860,3 +860,10 @@ input[type="number"]:focus, .filter-field select:focus { outline: 2px solid var(
 /* ===== cuenta (cambiar contraseña) ===== */
 .account-box { margin-top: 28px; max-width: 880px; margin-left: auto; margin-right: auto; }
 .account-box summary { cursor: pointer; color: var(--text-soft); font-size: 0.9rem; margin-bottom: 14px; }
+@media (max-width: 560px) {
+  /* En el celular el titulo usa todo el ancho y la cantidad / Quitar bajan a otra linea */
+  .manifest-item { flex-wrap: wrap; }
+  .manifest-item > div:not(.qty-stepper) { flex: 1 1 calc(100% - 70px); min-width: 0; }
+  .qty-stepper { margin-left: 70px; }
+  .qty-stepper + .manifest-item-remove { margin-left: auto; }
+}

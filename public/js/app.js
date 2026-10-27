@@ -728,7 +728,7 @@ async function renderOrders() {
           <span>Tienda: ${t.tiendaOrigen}</span>
           <span class="order-total">${money(t.desglose.totalPagar)}</span>
         </div>
-        ${t.estado !== 'cotizando' ? `<p class="manifest-item-price" style="margin-top:8px">Subtotal ${money(t.desglose.subtotal)} + envío ${money(t.desglose.envio)}</p>` : ''}
+        ${['pendiente_pago', 'pagado', 'completado'].includes(t.estado) || (t.estado === 'cancelado' && t.desglose.envio > 0) ? `<p class="manifest-item-price" style="margin-top:8px">Subtotal ${money(t.desglose.subtotal)} + envío ${money(t.desglose.envio)}</p>` : ''}
         ${t.estado === 'pendiente_pago' ? `
           <p class="manifest-item-price" style="margin-top:8px">Tu total ya está listo. Escríbenos para coordinar el pago y empezamos tu compra.</p>
           <a class="btn btn-stamp btn-sm" style="margin-top:8px" href="${PAYMENT_CONTACT_URL}" target="_blank" rel="noopener noreferrer">Coordinar pago de ${money(t.desglose.totalPagar)}</a>` : ''}
