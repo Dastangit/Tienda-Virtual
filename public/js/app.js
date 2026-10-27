@@ -368,12 +368,18 @@ function renderSearchResults() {
   syncFilterControls();
 
   count.hidden = false;
+  // Scrapingdog (Amazon) no permite ordenar por precio en su lado: se ordena lo ya cargado.
+  // Lo decimos para que nadie crea que ve lo mas barato de TODO Amazon.
+  const ls = state.lastSearch;
+  const notaAmazon = (ls && ls.source === 'amazon' && ['cheapest', 'unit'].includes(ls.sort))
+    ? ' · En Amazon se ordenan solo los productos cargados; usa "Cargar más" para ver más opciones'
+    : '';
   if (visibles.length === 0) {
     count.textContent = `Ningún producto cumple tus filtros (${total} cargados). Quita alguno o carga más resultados.`;
   } else if (activeFilterCount() > 0) {
-    count.textContent = `${visibles.length} de ${total} resultados con tus filtros — toca uno para ver más fotos`;
+    count.textContent = `${visibles.length} de ${total} resultados con tus filtros — toca uno para ver más fotos${notaAmazon}`;
   } else {
-    count.textContent = `${total} resultados — toca uno para ver más fotos`;
+    count.textContent = `${total} resultados — toca uno para ver más fotos${notaAmazon}`;
   }
 
   visibles.forEach(item => {

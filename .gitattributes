@@ -1,0 +1,2 @@
+# Saltos de linea siempre LF en el repositorio (evita diffs de archivo completo al editar desde Windows)
+* text=auto eol=lf

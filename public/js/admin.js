@@ -35,6 +35,15 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
+// escapeHtml NO escapa comillas, asi que no sirve dentro de atributos (src="...").
+// Para atributos: escapar tambien " y ', y aceptar solo URLs https.
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function imagenSegura(url) {
+  return /^https:\/\//i.test(String(url || '')) ? escapeAttr(url) : '';
+}
+
 // Enlace a la pagina real del producto en la tienda de origen.
 // Amazon: el originalId es el ASIN. Shein: el originalId es la URL del producto.
 // Por seguridad solo se aceptan enlaces https a amazon.com / shein.com.
@@ -236,7 +245,7 @@ function renderQuoteCard(carrito) {
     const opciones = [i.size && `Talla: ${i.size}`, i.color && `Color: ${i.color}`].filter(Boolean).join(' · ');
     return `
     <div class="order-product">
-      <img src="${i.image || ''}" alt="" loading="lazy">
+      <img src="${imagenSegura(i.image)}" alt="" loading="lazy">
       <span class="order-product-title">
         ${escapeHtml(i.title)}
         ${opciones ? `<span class="order-product-opts">${escapeHtml(opciones)}</span>` : ''}

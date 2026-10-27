@@ -118,9 +118,16 @@ const notificarNuevaCotizacion = async (carrito, cliente) => {
             .map(item => `• ${item.title} — $${item.precioFinalCliente}`)
             .join('\n');
 
-        await fetch(process.env.MAKE_WEBHOOK_URL, {
+        const res = await fetch(process.env.MAKE_WEBHOOK_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                // Clave opcional: si en Make activas "API key" en el webhook, solo pasan
+                // las peticiones que traigan este header. Sin la variable, no se envia nada.
+                ...(process.env.MAKE_WEBHOOK_SECRET ? { 'x-make-apikey': process.env.MAKE_WEBHOOK_SECRET } : {})
+            },
+            // Si Make se cuelga, no dejamos la promesa abierta indefinidamente.
+            signal: AbortSignal.timeout(10000),
             body: JSON.stringify({
                 carritoId: carrito._id.toString(),
                 cliente: cliente.phone,
@@ -130,6 +137,13 @@ const notificarNuevaCotizacion = async (carrito, cliente) => {
                 listaProductos
             })
         });
+
+        // fetch NO lanza error con respuestas 4xx/5xx (escenario apagado, clave mala...):
+        // sin esta revision el aviso fallaba en silencio y no te enterabas de la cotizacion.
+        if (!res.ok) {
+            const detalle = (await res.text().catch(() => '')).slice(0, 200);
+            console.error(`⚠️ Make rechazo el aviso de cotizacion ${carrito._id}: HTTP ${res.status} ${detalle}`);
+        }
     } catch (error) {
         console.error('⚠️ No se pudo notificar a Make:', error.message);
     }
