@@ -9,7 +9,9 @@ const cartItemSchema = new mongoose.Schema({
     precioFinalCliente: { type: Number, required: true }, // Tu precio calculado con el 20%
     image: { type: String },
     size: { type: String }, // Talla elegida por el cliente, si el producto maneja tallas
-    color: { type: String } // Nombre del color elegido, si el producto maneja colores
+    color: { type: String }, // Nombre del color elegido, si el producto maneja colores
+    // Unidades de este producto. Los items guardados antes de existir el campo cuentan como 1.
+    cantidad: { type: Number, default: 1, min: 1, max: 20 }
 });
 
 // 2. Estructura principal del carrito

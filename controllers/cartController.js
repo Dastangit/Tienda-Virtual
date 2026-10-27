@@ -2,6 +2,11 @@ const Cart = require('../models/Cart');
 const ProductCache = require('../models/ProductCache');
 const { calcularPrecioFinal } = require('../utils/pricing');
 
+const MAX_CANTIDAD = 20;
+// Total de una linea del carrito (precio con margen x unidades) y del carrito completo
+const totalItem = (item) => item.precioFinalCliente * (item.cantidad || 1);
+const subtotalCarrito = (carrito) => parseFloat(carrito.items.reduce((acc, item) => acc + totalItem(item), 0).toFixed(2));
+
 // 1. OBTENER EL CARRITO DEL USUARIO
 const obtenerCarrito = async (req, res) => {
     try {
@@ -74,7 +79,16 @@ const agregarAlCarrito = async (req, res) => {
             }
         }
 
-        carrito.items.push({ originalId, source, title, price, precioFinalCliente, image, size, color });
+        // Mismo producto con la misma talla y color: se suma una unidad en vez de repetir la linea
+        const repetido = carrito.items.find(i => i.originalId === originalId && (i.size || '') === (size || '') && (i.color || '') === (color || ''));
+        if (repetido) {
+            if ((repetido.cantidad || 1) >= MAX_CANTIDAD) {
+                return res.status(400).json({ error: `Máximo ${MAX_CANTIDAD} unidades por producto.` });
+            }
+            repetido.cantidad = (repetido.cantidad || 1) + 1;
+        } else {
+            carrito.items.push({ originalId, source, title, price, precioFinalCliente, image, size, color });
+        }
         await carrito.save();
 
         res.status(201).json({
@@ -110,15 +124,38 @@ const eliminarDelCarrito = async (req, res) => {
     }
 };
 
+// 3b. CAMBIAR LA CANTIDAD DE UN PRODUCTO DEL CARRITO
+const cambiarCantidad = async (req, res) => {
+    try {
+        const cantidad = req.body.cantidad;
+        if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > MAX_CANTIDAD) {
+            return res.status(400).json({ error: `La cantidad debe ser un número entero entre 1 y ${MAX_CANTIDAD}` });
+        }
+
+        const carrito = await Cart.findOne({ user: req.user._id, status: 'activo' });
+        const item = carrito && carrito.items.find(i => i._id.toString() === req.params.itemId);
+        if (!item) {
+            return res.status(404).json({ error: 'Ese producto no está en tu carrito' });
+        }
+
+        item.cantidad = cantidad;
+        await carrito.save();
+        res.json({ mensaje: 'Cantidad actualizada', carrito });
+    } catch (error) {
+        console.error('❌ Error al cambiar la cantidad:', error.message);
+        res.status(500).json({ error: 'Error interno al cambiar la cantidad' });
+    }
+};
+
 // Le avisa a Make (Telegram) que hay una cotizacion nueva.
 // No debe tumbar la peticion del cliente si Make falla: solo se loguea el error.
 const notificarNuevaCotizacion = async (carrito, cliente) => {
     if (!process.env.MAKE_WEBHOOK_URL) return;
 
     try {
-        const subtotal = carrito.items.reduce((acc, item) => acc + item.precioFinalCliente, 0);
+        const subtotal = subtotalCarrito(carrito);
         const listaProductos = carrito.items
-            .map(item => `• ${item.title} — $${item.precioFinalCliente}`)
+            .map(item => `• ${(item.cantidad || 1) > 1 ? `${item.cantidad} x ` : ''}${item.title} — $${item.precioFinalCliente}`)
             .join('\n');
 
         const res = await fetch(process.env.MAKE_WEBHOOK_URL, {
@@ -135,8 +172,8 @@ const notificarNuevaCotizacion = async (carrito, cliente) => {
                 carritoId: carrito._id.toString(),
                 cliente: cliente.phone,
                 fuente: carrito.items[0].source.toUpperCase(),
-                cantidadProductos: carrito.items.length,
-                subtotal: parseFloat(subtotal.toFixed(2)),
+                cantidadProductos: carrito.items.reduce((acc, item) => acc + (item.cantidad || 1), 0),
+                subtotal,
                 listaProductos
             })
         });
@@ -180,7 +217,7 @@ const confirmarCotizacion = async (req, res) => {
 // 5. FORMATO DE ORDEN
 // Convierte un carrito de Mongo en el JSON de recibo que dibuja el frontend (Mis cotizaciones).
 const formatearOrden = (carrito) => {
-    const subtotal = carrito.items.reduce((acc, item) => acc + item.precioFinalCliente, 0);
+    const subtotal = subtotalCarrito(carrito);
     return {
         numeroOrden: carrito._id,
         fecha: carrito.updatedAt,
@@ -188,13 +225,14 @@ const formatearOrden = (carrito) => {
         tiendaOrigen: carrito.items[0]?.source?.toUpperCase() || '',
         productos: carrito.items.map(item => ({
             titulo: item.title,
-            precio: item.precioFinalCliente,
+            precio: item.precioFinalCliente, // por unidad
+            cantidad: item.cantidad || 1,
             imagen: item.image || '',
             talla: item.size || '',
             color: item.color || ''
         })),
         desglose: {
-            subtotal: parseFloat(subtotal.toFixed(2)),
+            subtotal,
             envio: parseFloat((carrito.costoEnvio || 0).toFixed(2)),
             totalPagar: parseFloat((subtotal + (carrito.costoEnvio || 0)).toFixed(2))
         }
@@ -222,6 +260,7 @@ module.exports = {
     obtenerCarrito, 
     agregarAlCarrito, 
     eliminarDelCarrito, 
+    cambiarCantidad,
     confirmarCotizacion,
     obtenerHistorial
 };

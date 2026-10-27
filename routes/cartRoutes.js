@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { obtenerCarrito, agregarAlCarrito, eliminarDelCarrito, confirmarCotizacion, obtenerHistorial } = require('../controllers/cartController');
+const { obtenerCarrito, agregarAlCarrito, eliminarDelCarrito, cambiarCantidad, confirmarCotizacion, obtenerHistorial } = require('../controllers/cartController');
 const { protect } = require('../middleware/authMiddleware');
 
 router.get('/', protect, obtenerCarrito);
@@ -11,6 +11,9 @@ router.put('/confirmar', protect, confirmarCotizacion);
 
 // Ruta para el historial completo ("Mis cotizaciones"): GET /api/carrito/historial
 router.get('/historial', protect, obtenerHistorial);
+
+// Ruta para cambiar cuántas unidades lleva un producto: PUT /api/carrito/:itemId { cantidad }
+router.put('/:itemId', protect, cambiarCantidad);
 
 // Ruta para eliminar un producto: DELETE /api/carrito/:itemId
 router.delete('/:itemId', protect, eliminarDelCarrito);

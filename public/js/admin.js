@@ -235,14 +235,15 @@ function whatsappAvisoUrl(carrito, subtotal) {
 }
 
 function renderQuoteCard(carrito) {
-  const subtotal = carrito.items.reduce((acc, i) => acc + i.precioFinalCliente, 0);
+  const subtotal = carrito.items.reduce((acc, i) => acc + i.precioFinalCliente * (i.cantidad || 1), 0);
   const tienda = (carrito.items[0]?.source || '').toUpperCase();
   const fecha = new Date(carrito.updatedAt).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   const productosHtml = carrito.items.map(i => {
     const url = productUrl(i);
     const tiendaNombre = i.source === 'shein' ? 'Shein' : 'Amazon';
-    const opciones = [i.size && `Talla: ${i.size}`, i.color && `Color: ${i.color}`].filter(Boolean).join(' · ');
+    const cantidad = i.cantidad || 1;
+    const opciones = [cantidad > 1 && `Cantidad: ${cantidad}`, i.size && `Talla: ${i.size}`, i.color && `Color: ${i.color}`].filter(Boolean).join(' · ');
     return `
     <div class="order-product">
       <img src="${imagenSegura(i.image)}" alt="" loading="lazy">
@@ -251,7 +252,7 @@ function renderQuoteCard(carrito) {
         ${opciones ? `<span class="order-product-opts">${escapeHtml(opciones)}</span>` : ''}
         ${url ? `<a class="order-product-link" href="${url.replace(/"/g, '%22')}" target="_blank" rel="noopener noreferrer">Ver en ${tiendaNombre} ↗</a>` : ''}
       </span>
-      <span class="order-product-price">${money(i.precioFinalCliente)}</span>
+      <span class="order-product-price">${cantidad > 1 ? `${cantidad} × ${money(i.precioFinalCliente)}<br>` : ''}${money(i.precioFinalCliente * cantidad)}</span>
     </div>
   `;
   }).join('');

@@ -389,6 +389,19 @@ a.btn { text-decoration: none; display: inline-block; text-align: center; }
   font-size: 0.88rem;
   color: var(--text-soft);
 }
+.qty-stepper { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
+.qty-btn {
+  width: 30px; height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.qty-btn:disabled { opacity: 0.4; cursor: default; }
+.qty-value { font-family: var(--font-mono); min-width: 1.4em; text-align: center; }
+.qty-stepper + .manifest-item-remove { margin-left: 4px; }
 .manifest-item-remove {
   background: none; border: none;
   color: var(--danger);

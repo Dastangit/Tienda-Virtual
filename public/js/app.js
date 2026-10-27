@@ -7,6 +7,8 @@ const ROLE_KEY = 'tv_role';
 const MAX_MODAL_PHOTOS = 5;
 // Con el filtro de valoracion activo (por defecto), se exige ademas este minimo de resenas.
 const MIN_RESENAS = 10;
+// Tope de unidades por producto (igual que MAX_CANTIDAD en cartController.js)
+const MAX_CANTIDAD = 20;
 // A dónde va el cliente a coordinar el pago cuando su pedido está "Listo para pagar".
 // Cambia esta URL si prefieres otro canal.
 const PAYMENT_CONTACT_URL = 'https://wa.me/16055003653';
@@ -573,7 +575,7 @@ $('#modalAddBtn').addEventListener('click', async () => {
 async function refreshCartCount() {
   try {
     const carrito = await api('/api/carrito');
-    const count = (carrito.items || []).length;
+    const count = (carrito.items || []).reduce((acc, i) => acc + (i.cantidad || 1), 0);
     $('#cartCount').textContent = count;
   } catch (_) { /* silencioso */ }
 }
@@ -603,14 +605,20 @@ async function renderCart() {
 
   let subtotal = 0;
   items.forEach(item => {
-    subtotal += item.precioFinalCliente;
+    const cantidad = item.cantidad || 1;
+    subtotal += item.precioFinalCliente * cantidad;
     const li = document.createElement('li');
     li.className = 'manifest-item';
     li.innerHTML = `
       <img src="${escapeHtml(item.image || '')}" alt="">
       <div>
         <p class="manifest-item-title">${escapeHtml(item.title)}</p>
-        <span class="manifest-item-price">${money(item.precioFinalCliente)} · ${item.source.toUpperCase()}${item.size ? ' · Talla ' + escapeHtml(item.size) : ''}${item.color ? ' · ' + escapeHtml(item.color) : ''}</span>
+        <span class="manifest-item-price">${money(item.precioFinalCliente)}${cantidad > 1 ? ` c/u · ${money(item.precioFinalCliente * cantidad)}` : ''} · ${item.source.toUpperCase()}${item.size ? ' · Talla ' + escapeHtml(item.size) : ''}${item.color ? ' · ' + escapeHtml(item.color) : ''}</span>
+      </div>
+      <div class="qty-stepper" data-item-id="${item._id}">
+        <button type="button" class="qty-btn" data-delta="-1" aria-label="Quitar una unidad" ${cantidad <= 1 ? 'disabled' : ''}>−</button>
+        <span class="qty-value">${cantidad}</span>
+        <button type="button" class="qty-btn" data-delta="1" aria-label="Agregar una unidad" ${cantidad >= MAX_CANTIDAD ? 'disabled' : ''}>+</button>
       </div>
       <button class="manifest-item-remove" data-item-id="${item._id}">Quitar</button>
     `;
@@ -618,6 +626,24 @@ async function renderCart() {
   });
 
   $('#cartSubtotal').textContent = money(subtotal);
+
+  $all('.qty-btn', list).forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const stepper = btn.closest('.qty-stepper');
+      const actual = Number($('.qty-value', stepper).textContent);
+      $all('.qty-btn', stepper).forEach(b => { b.disabled = true; });
+      try {
+        await api(`/api/carrito/${stepper.dataset.itemId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ cantidad: actual + Number(btn.dataset.delta) })
+        });
+      } catch (err) {
+        toast(err.message);
+      }
+      renderCart();
+      refreshCartCount();
+    });
+  });
 
   $all('.manifest-item-remove', list).forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -684,8 +710,8 @@ async function renderOrders() {
     const productosHtml = t.productos.map(p => `
       <div class="order-product">
         <img src="${escapeHtml(p.imagen || '')}" alt="" loading="lazy">
-        <span class="order-product-title">${escapeHtml(p.titulo)}${p.talla ? ' · Talla ' + escapeHtml(p.talla) : ''}${p.color ? ' · ' + escapeHtml(p.color) : ''}</span>
-        <span class="order-product-price">${money(p.precio)}</span>
+        <span class="order-product-title">${(p.cantidad || 1) > 1 ? `${p.cantidad} × ` : ''}${escapeHtml(p.titulo)}${p.talla ? ' · Talla ' + escapeHtml(p.talla) : ''}${p.color ? ' · ' + escapeHtml(p.color) : ''}</span>
+        <span class="order-product-price">${money(p.precio * (p.cantidad || 1))}</span>
       </div>
     `).join('');
 

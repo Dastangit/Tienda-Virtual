@@ -178,6 +178,11 @@ const verificarPrecios = async (req, res) => {
 // "Facturado" = subtotal de productos + envío de pedidos con pago confirmado (pagado/completado).
 // "Margen" = lo que ganas sobre el precio base de los productos (precioFinalCliente - price).
 // Los pedidos pagados antes de existir `pagadoAt` usan updatedAt como aproximación.
+// Suma de un campo de los items multiplicado por la cantidad (los items viejos sin cantidad valen 1)
+const sumaItems = (campo) => ({
+    $sum: { $map: { input: '$items', in: { $multiply: [`$$this.${campo}`, { $ifNull: ['$$this.cantidad', 1] }] } } }
+});
+
 const TIMEZONE_REPORTES = process.env.STATS_TIMEZONE || 'America/Santo_Domingo';
 
 const obtenerEstadisticas = async (req, res) => {
@@ -191,8 +196,8 @@ const obtenerEstadisticas = async (req, res) => {
                 { $match: { status: { $in: ['pagado', 'completado'] } } },
                 { $addFields: {
                     fechaPago: { $ifNull: ['$pagadoAt', '$updatedAt'] },
-                    subtotal: { $sum: '$items.precioFinalCliente' },
-                    costoBase: { $sum: '$items.price' }
+                    subtotal: sumaItems('precioFinalCliente'),
+                    costoBase: sumaItems('price')
                 } },
                 { $group: {
                     _id: { $dateToString: { format: '%Y-%m', date: '$fechaPago', timezone: TIMEZONE_REPORTES } },
@@ -209,7 +214,7 @@ const obtenerEstadisticas = async (req, res) => {
                 { $group: {
                     _id: null,
                     pedidos: { $sum: 1 },
-                    monto: { $sum: { $add: [{ $sum: '$items.precioFinalCliente' }, { $ifNull: ['$costoEnvio', 0] }] } }
+                    monto: { $sum: { $add: [sumaItems('precioFinalCliente'), { $ifNull: ['$costoEnvio', 0] }] } }
                 } }
             ])
         ]);
