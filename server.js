@@ -2,7 +2,6 @@
 const dns = require('dns');
 const express = require('express');
 const dotenv = require('dotenv');
-const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 
@@ -41,7 +40,8 @@ app.use(helmet({
         }
     }
 }));
-app.use(cors());
+// Sin cors(): el frontend se sirve desde este mismo servidor, asi que ningun otro sitio web
+// necesita llamar a la API desde el navegador (y ahora no puede).
 app.use(express.json());
 
 // ---> FRONTEND (archivos estaticos: index.html, css, js) <---
