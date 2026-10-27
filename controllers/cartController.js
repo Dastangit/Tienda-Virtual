@@ -177,8 +177,8 @@ const confirmarCotizacion = async (req, res) => {
     }
 };
 
-// 5. GENERAR TICKET DE COMPRA (Checkout)
-// Convierte un carrito de Mongo en el JSON de recibo que dibuja el frontend.
+// 5. FORMATO DE ORDEN
+// Convierte un carrito de Mongo en el JSON de recibo que dibuja el frontend (Mis cotizaciones).
 const formatearOrden = (carrito) => {
     const subtotal = carrito.items.reduce((acc, item) => acc + item.precioFinalCliente, 0);
     return {
@@ -199,28 +199,6 @@ const formatearOrden = (carrito) => {
             totalPagar: parseFloat((subtotal + (carrito.costoEnvio || 0)).toFixed(2))
         }
     };
-};
-
-const generarTicket = async (req, res) => {
-    try {
-        // Buscamos un carrito que ya haya solicitado cotización
-        const carrito = await Cart.findOne({ 
-            user: req.user._id, 
-            status: { $in: ['cotizando', 'pendiente_pago', 'pagado'] } 
-        });
-
-        if (!carrito || carrito.items.length === 0) {
-            return res.status(404).json({ error: 'No tienes órdenes en proceso de cotización.' });
-        }
-
-        const ticket = formatearOrden(carrito);
-        ticket.instrucciones = "Usa este resumen para realizar el pago off-platform.";
-
-        res.json({ ticket });
-    } catch (error) {
-        console.error('❌ Error al generar el ticket:', error.message);
-        res.status(500).json({ error: 'Error interno al generar el ticket' });
-    }
 };
 
 // 6. HISTORIAL COMPLETO DE COTIZACIONES DEL CLIENTE ("Mis cotizaciones")
@@ -245,6 +223,5 @@ module.exports = {
     agregarAlCarrito, 
     eliminarDelCarrito, 
     confirmarCotizacion,
-    generarTicket,
     obtenerHistorial
 };

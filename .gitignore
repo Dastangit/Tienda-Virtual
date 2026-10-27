@@ -13,3 +13,6 @@ scripts/reset-admin-password.js
 
 # Copias de seguridad de la base de datos (contienen datos de clientes)
 backups/
+
+# Copia del frontend anterior (no forma parte de la app)
+_backup_frontend_js_*/
