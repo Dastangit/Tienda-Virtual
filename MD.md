@@ -11,11 +11,11 @@ Arquitectura backend para un sistema de Proxy Shopping. Permite la búsqueda de 
 
 ---
 
-## ✅ FASE 1: Módulos Completados (Progreso Actual)
+## ✅ FASE 1: Módulos Completados
 
 ### 1. Configuración del Núcleo (`server.js`)
 * Inicialización del servidor Express en el puerto `5000`.
-* Middlewares globales configurados: `cors` para cruce de dominios y `express.json()` para parseo de datos.
+* Middlewares globales: `helmet` (cabeceras de seguridad) y `express.json()` para parseo de datos. Sirve también el frontend (`public/`).
 * Conexión exitosa a MongoDB Atlas estableciendo persistencia en la nube.
 
 ### 2. Motor de Búsqueda y Cotización (`searchRoutes`, `searchController`)
@@ -30,33 +30,33 @@ Arquitectura backend para un sistema de Proxy Shopping. Permite la búsqueda de 
 
 ### 4. Motor del Carrito de Compras (`cartRoutes`, `cartController`, `models/Cart.js`)
 * **Snapshot de Precios:** El modelo almacena una "fotografía" del precio del producto al momento exacto de agregarlo, protegiendo la transacción contra fluctuaciones de mercado en la tienda de origen.
-* **Gestión de Estados:** Soporte estructural para transiciones del ciclo de compra (estados: `activo`, `cotizando`, `pagado`, `completado`).
+* **Gestión de Estados:** `activo` → `cotizando` → `pendiente_pago` → `pagado` → `completado`, o `cancelado`.
 * **Inyección Segura:** Inserción de productos basada exclusivamente en el token validado (`req.user._id`), haciendo imposible la manipulación de carritos ajenos.
 
 ---
 
-## 🚀 FASE 2: Hoja de Ruta Técnica (Lo que falta por construir)
+## ✅ FASE 2: Completada
+* **Carrito:** quitar productos, cantidad por producto (1 a 20, botones − / +; el mismo producto con la misma talla y color suma unidades) y confirmación de cotización (`activo` → `cotizando`) con aviso al admin vía Make (Telegram).
+* **Roles y panel de administración** (`/admin.html`): asignar envío (`cotizando` → `pendiente_pago`), confirmar pago (→ `pagado`), completar (→ `completado`), verificar precios actuales antes de comprar, estadísticas del mes y avisos al cliente por WhatsApp (enlaces `wa.me`, sin API).
+* **Tiendas reales:** Amazon vía Scrapingdog y Shein vía Omkar Cloud.
+* **Frontend web** (`public/`): búsqueda con filtros, carrito, "Mis cotizaciones", términos y condiciones.
 
-### 1. Finalización del Módulo del Carrito
-* **Remoción de Ítems:** Crear la ruta `DELETE /api/carrito/:idProducto` para que el cliente pueda limpiar su lista.
-* **Confirmación de Cotización:** Crear el endpoint que cambie el estado del carrito de `activo` a `cotizando`, enviando una alerta al administrador para calcular el peso de envío.
+---
 
-### 2. Panel de Administración y Envíos (Backend)
-* **Protección de Roles:** Expandir el middleware de autenticación para diferenciar entre clientes normales y cuentas de administrador.
-* **Resolución de Órdenes:** Rutas para que el administrador asigne el costo de envío final a un carrito `cotizando` y lo pase a `pagado`.
+## 🛡️ Preparación para el lanzamiento (Oct 2026)
+* **Créditos protegidos:** además del límite por usuario, hay un **tope global diario** de llamadas pagadas a Scrapingdog/Omkar (`TOPE_LLAMADAS_DIARIAS`, por defecto 300; se cuenta en la colección `usoproveedors`, un documento por día). Al llegar al tope los clientes ven un aviso; el admin no se bloquea. Registro limitado a 5 cuentas por IP y hora (no se baja más porque en Cuba muchos clientes comparten IP).
+* **Un solo carrito activo por cliente:** índice único parcial en `Cart`. Si la base de producción ya tenía clientes con dos carritos activos, el índice no se crea: correr `node scripts/revisar-carritos-duplicados.js` (muestra los casos) y `--arreglar` (los une).
+* **Validaciones del admin:** `costoEnvio` debe ser un número entre 0 y 1000; un id de carrito mal formado da 404.
+* **Contraseñas:** el admin genera una contraseña temporal desde el panel ("Restablecer contraseña de un cliente") y se la envía por WhatsApp; el cliente la cambia en "Mis cotizaciones" → "Cambiar mi contraseña". El login tiene un enlace "¿Olvidaste tu contraseña?" que abre WhatsApp. Al cambiar la contraseña, los tokens anteriores dejan de valer (`passwordChangedAt`).
+* **Cancelaciones:** estado `cancelado`. El cliente cancela antes de pagar (`cotizando`/`pendiente_pago`); el admin también puede cancelar un pedido `pagado` y el panel avisa que hay que reembolsar (`estadoAlCancelar`). Pestaña "Cancelados" en el panel.
+* **Sin CORS abierto:** el frontend se sirve desde el mismo servidor.
+* **Pruebas automáticas:** `npm test` (Node test runner + MongoDB en memoria con `mongodb-memory-server`; no toca Atlas ni gasta créditos: Scrapingdog/Omkar se simulan). Cubre registro, login, contraseñas, carrito, cantidades, cancelaciones, flujo del admin, estadísticas y el tope diario.
+* **Copias:** `npm run backup` guarda la base en `backups/AAAA-MM-DD_HHMM/` y conserva las 8 más recientes.
+* **Producción (Render):** `NODE_ENV=production`, Node 24 a 26 (`engines`).
 
-### 3. Extracción Avanzada de Datos (Integración de APIs)
-* Reemplazar la búsqueda de prueba con llamadas a tiendas reales (ej. Amazon).
-* Implementar estrategias de Prompt Engineering conectando las APIs de modelos como Gemini, OpenAI o DeepSeek para estructurar la metadata cruda de los productos en formatos JSON perfectos antes de enviarlos al frontend.
-
-### 4. Orquestación y Automatización
-* Conectar el backend con plataformas low-code como **n8n** o **Make.com** vía webhooks. 
-* *Objetivo:* Disparar flujos automatizados de mensajería (ej. confirmaciones por correo o alertas a tu teléfono) cada vez que un cliente solicite una cotización.
-
-### 5. Desarrollo de Interfaz (Frontend)
-* Consumo de la API actual para construir la interfaz visual.
-* Opciones de arquitectura frontal: Desarrollar una aplicación móvil nativa utilizando **React Native** o una experiencia de navegador a través de una **PWA** (Progressive Web App).
-* **Diseño UI:** Aplicación del sistema de variables de alto contraste (incorporando tonalidades como `#F5F4EF` para fondos y `#1C2624` para elementos principales).
+### Pendiente / ideas
+* Integración de IA para estructurar metadata de productos (Gemini, OpenAI, DeepSeek).
+* Pagos dentro de la plataforma (hoy se coordinan por WhatsApp).
 
 ---
 
