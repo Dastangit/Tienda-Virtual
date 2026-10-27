@@ -461,6 +461,8 @@ a.btn { text-decoration: none; display: inline-block; text-align: center; }
 .order-status.is-pagado { background: var(--green-bg); color: var(--green); }
 .order-status.is-pendiente_pago { background: rgba(139, 92, 246, 0.14); color: var(--violet); }
 .order-status.is-completado { background: rgba(34, 211, 238, 0.12); color: var(--cyan); }
+.order-status.is-cancelado { background: rgba(248, 113, 113, 0.12); color: var(--danger); }
+.order-cancel-btn { color: var(--danger); font-size: 0.85rem; margin-top: 10px; }
 
 /* ===== Servicios ===== */
 .service-grid {

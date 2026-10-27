@@ -136,7 +136,7 @@ $all('.admin-tabs .source-btn').forEach(btn => {
     $all('.admin-tabs .source-btn').forEach(b => b.classList.remove('is-active'));
     btn.classList.add('is-active');
     state.status = btn.dataset.status;
-    const titulos = { cotizando: 'Cotizaciones pendientes', pendiente_pago: 'Esperando que el cliente pague', pagado: 'Pedidos pagados, por completar', completado: 'Pedidos completados' };
+    const titulos = { cotizando: 'Cotizaciones pendientes', pendiente_pago: 'Esperando que el cliente pague', pagado: 'Pedidos pagados, por completar', completado: 'Pedidos completados', cancelado: 'Pedidos cancelados' };
     $('#dashboardTitle').textContent = titulos[state.status] || '';
     loadQuotes();
   });
@@ -202,6 +202,9 @@ async function loadQuotes() {
   $all('.quote-confirm-pago-btn', list).forEach(btn => {
     btn.addEventListener('click', onConfirmPagoClick);
   });
+  $all('.quote-cancel-btn', list).forEach(btn => {
+    btn.addEventListener('click', onCancelClick);
+  });
   $all('.price-check-btn', list).forEach(btn => {
     btn.addEventListener('click', onPriceCheckClick);
   });
@@ -228,7 +231,8 @@ function whatsappAvisoUrl(carrito, subtotal) {
   const mensajes = {
     pendiente_pago: `${saludo} Tu pedido #${orden} ya tiene el total listo para pagar: ${total} (productos ${money(subtotal)} + env\u00edo ${money(envio)}). Entra a "Mis cotizaciones" en ${window.location.origin} para verlo y coordinar el pago.`,
     pagado: `${saludo} Confirmamos el pago de tu pedido #${orden} (${total}). Ya estamos gestionando tu compra y te avisamos cuando est\u00e9 lista.`,
-    completado: `${saludo} Tu pedido #${orden} est\u00e1 completado. \u00a1Gracias por tu compra!`
+    completado: `${saludo} Tu pedido #${orden} est\u00e1 completado. \u00a1Gracias por tu compra!`,
+    cancelado: `${saludo} Tu pedido #${orden} fue cancelado.${carrito.estadoAlCancelar === 'pagado' ? ` Te devolveremos ${total}; te escribimos para coordinarlo.` : ''} Si tienes dudas, resp\u00f3ndenos aqu\u00ed.`
   };
   const texto = mensajes[carrito.status];
   return texto ? `https://wa.me/${tel}?text=${encodeURIComponent(texto)}` : '';
@@ -258,12 +262,14 @@ function renderQuoteCard(carrito) {
   }).join('');
 
   const waUrl = whatsappAvisoUrl(carrito, subtotal);
+  const cancelarHtml = `<button type="button" class="btn btn-ghost btn-sm quote-cancel-btn">Cancelar pedido</button>`;
   let accionHtml = '';
   if (carrito.status === 'cotizando') {
     accionHtml = `
       <form class="quote-assign-form">
         <input type="number" name="costoEnvio" step="0.01" min="0" placeholder="Costo de envío" required>
         <button type="submit" class="btn btn-stamp btn-sm">Asignar costo de envío</button>
+        ${cancelarHtml}
       </form>
     `;
   } else if (carrito.status === 'pendiente_pago') {
@@ -273,6 +279,7 @@ function renderQuoteCard(carrito) {
         <div class="quote-notify-row">
           ${waUrl ? `<a class="btn btn-sm btn-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">Avisar por WhatsApp</a>` : ''}
           <button type="button" class="btn btn-stamp btn-sm quote-confirm-pago-btn">Confirmar pago recibido</button>
+          ${cancelarHtml}
         </div>
       </div>
     `;
@@ -283,8 +290,18 @@ function renderQuoteCard(carrito) {
         <button type="button" class="btn btn-ghost btn-sm price-check-btn">Verificar precios actuales</button>
         <button type="button" class="btn btn-stamp btn-sm quote-complete-btn">Marcar como completado</button>
         ${waUrl ? `<a class="btn btn-sm btn-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">Avisar por WhatsApp</a>` : ''}
+        ${cancelarHtml}
       </div>
       <div class="price-check-result" hidden></div>
+    `;
+  } else if (carrito.status === 'cancelado') {
+    const quien = carrito.canceladoPor === 'cliente' ? 'el cliente' : 'ti';
+    const fechaCancel = carrito.canceladoAt ? new Date(carrito.canceladoAt).toLocaleDateString('es', { day: 'numeric', month: 'short' }) : '';
+    accionHtml = `
+      <div class="quote-assign-form">
+        <span class="manifest-item-price">Cancelado por ${quien}${fechaCancel ? ' el ' + fechaCancel : ''}${carrito.estadoAlCancelar === 'pagado' ? ' · <strong>Estaba pagado: devuélvele el dinero</strong>' : ''}</span>
+        ${waUrl ? `<a class="btn btn-sm btn-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">Avisar por WhatsApp</a>` : ''}
+      </div>
     `;
   } else {
     accionHtml = `
@@ -362,6 +379,23 @@ async function onConfirmPagoClick(e) {
   try {
     const data = await api(`/api/admin/carritos/${cartId}/confirmar-pago`, { method: 'PUT' });
     toast(data.mensaje || 'Pago confirmado');
+    loadQuotes();
+  } catch (err) {
+    setError(errId, err.message);
+    e.target.disabled = false;
+  }
+}
+
+async function onCancelClick(e) {
+  const card = e.target.closest('.quote-card');
+  const cartId = card.dataset.cartId;
+  const errId = `quote-${cartId}`;
+  if (!confirm('¿Cancelar este pedido? El cliente lo verá como cancelado.')) return;
+  setError(errId, '');
+  e.target.disabled = true;
+  try {
+    const data = await api(`/api/admin/carritos/${cartId}/cancelar`, { method: 'PUT' });
+    toast(data.mensaje || 'Pedido cancelado');
     loadQuotes();
   } catch (err) {
     setError(errId, err.message);

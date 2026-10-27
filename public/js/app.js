@@ -703,8 +703,10 @@ async function renderOrders() {
       cotizando: 'Cotizando envío',
       pendiente_pago: 'Listo para pagar',
       pagado: 'Pagado',
-      completado: 'Completado'
+      completado: 'Completado',
+      cancelado: 'Cancelado'
     }[t.estado] || t.estado;
+    const cancelable = t.estado === 'cotizando' || t.estado === 'pendiente_pago';
     const fecha = new Date(t.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' });
 
     const productosHtml = t.productos.map(p => `
@@ -730,10 +732,28 @@ async function renderOrders() {
         ${t.estado === 'pendiente_pago' ? `
           <p class="manifest-item-price" style="margin-top:8px">Tu total ya está listo. Escríbenos para coordinar el pago y empezamos tu compra.</p>
           <a class="btn btn-stamp btn-sm" style="margin-top:8px" href="${PAYMENT_CONTACT_URL}" target="_blank" rel="noopener noreferrer">Coordinar pago de ${money(t.desglose.totalPagar)}</a>` : ''}
+        ${t.estado === 'cancelado' && t.canceladoPor === 'admin' ? `<p class="manifest-item-price" style="margin-top:8px">Cancelamos este pedido. Si ya habías pagado, te devolvemos el dinero; escríbenos si tienes dudas.</p>` : ''}
+        ${cancelable ? `<button type="button" class="link-btn order-cancel-btn" data-order-id="${escapeHtml(t.numeroOrden)}">Cancelar pedido</button>` : ''}
       </div>
     `;
   }).join('');
 }
+
+// Cancelar un pedido propio antes de pagarlo (los botones se crean en renderOrders)
+$('#ordersContent').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.order-cancel-btn');
+  if (!btn) return;
+  if (!confirm('¿Seguro que quieres cancelar este pedido? Esto no se puede deshacer.')) return;
+  btn.disabled = true;
+  try {
+    await api(`/api/carrito/pedidos/${btn.dataset.orderId}/cancelar`, { method: 'PUT' });
+    toast('Pedido cancelado');
+    renderOrders();
+  } catch (err) {
+    toast(err.message);
+    btn.disabled = false;
+  }
+});
 
 // ---------- cambiar contraseña ----------
 $('#passwordForm').addEventListener('submit', async (e) => {

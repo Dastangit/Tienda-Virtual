@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Cart = require('../models/Cart');
 const ProductCache = require('../models/ProductCache');
 const { calcularPrecioFinal } = require('../utils/pricing');
@@ -147,6 +148,36 @@ const cambiarCantidad = async (req, res) => {
     }
 };
 
+// 3c. CANCELAR UN PEDIDO PROPIO (solo antes de pagar; despues de pagar se gestiona con el admin)
+const cancelarPedido = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(404).json({ error: 'Pedido no encontrado' });
+        }
+
+        // Filtrando por user, un cliente nunca puede cancelar el pedido de otro
+        const carrito = await Cart.findOne({ _id: id, user: req.user._id });
+        if (!carrito || carrito.status === 'activo') {
+            return res.status(404).json({ error: 'Pedido no encontrado' });
+        }
+        if (!['cotizando', 'pendiente_pago'].includes(carrito.status)) {
+            return res.status(400).json({ error: 'Este pedido ya no se puede cancelar desde aquí. Escríbenos por WhatsApp.' });
+        }
+
+        carrito.estadoAlCancelar = carrito.status;
+        carrito.status = 'cancelado';
+        carrito.canceladoAt = new Date();
+        carrito.canceladoPor = 'cliente';
+        await carrito.save();
+
+        res.json({ mensaje: 'Pedido cancelado', carrito });
+    } catch (error) {
+        console.error('❌ Error al cancelar el pedido:', error.message);
+        res.status(500).json({ error: 'Error interno al cancelar el pedido' });
+    }
+};
+
 // Le avisa a Make (Telegram) que hay una cotizacion nueva.
 // No debe tumbar la peticion del cliente si Make falla: solo se loguea el error.
 const notificarNuevaCotizacion = async (carrito, cliente) => {
@@ -221,7 +252,8 @@ const formatearOrden = (carrito) => {
     return {
         numeroOrden: carrito._id,
         fecha: carrito.updatedAt,
-        estado: carrito.status, // 'cotizando' (esperando envio) | 'pagado' | 'completado'
+        estado: carrito.status, // 'cotizando' (esperando envio) | 'pendiente_pago' | 'pagado' | 'completado' | 'cancelado'
+        canceladoPor: carrito.canceladoPor || '',
         tiendaOrigen: carrito.items[0]?.source?.toUpperCase() || '',
         productos: carrito.items.map(item => ({
             titulo: item.title,
@@ -261,6 +293,7 @@ module.exports = {
     agregarAlCarrito, 
     eliminarDelCarrito, 
     cambiarCantidad,
+    cancelarPedido,
     confirmarCotizacion,
     obtenerHistorial
 };

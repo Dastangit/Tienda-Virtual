@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { restablecerPassword, obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas } = require('../controllers/adminController');
+const { cancelarPedido, restablecerPassword, obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas } = require('../controllers/adminController');
 const mongoose = require('mongoose');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -26,6 +26,9 @@ router.put('/carritos/:id/confirmar-pago', protect, admin, confirmarPago);
 
 // PUT /api/admin/carritos/:id/completar -> marca un carrito "pagado" como "completado" (entregado)
 router.put('/carritos/:id/completar', protect, admin, marcarCompletado);
+
+// PUT /api/admin/carritos/:id/cancelar -> cancela un pedido (si estaba pagado, toca reembolsar)
+router.put('/carritos/:id/cancelar', protect, admin, cancelarPedido);
 
 // GET /api/admin/carritos/:id/verificar-precios -> compara precio cotizado vs precio actual en la tienda
 router.get('/carritos/:id/verificar-precios', protect, admin, verificarPrecios);

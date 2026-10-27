@@ -9,7 +9,7 @@ const { calcularPrecioFinal } = require('../utils/pricing');
 const obtenerCotizaciones = async (req, res) => {
     try {
         const status = req.query.status || 'cotizando';
-        const estadosValidos = ['cotizando', 'pendiente_pago', 'pagado', 'completado'];
+        const estadosValidos = ['cotizando', 'pendiente_pago', 'pagado', 'completado', 'cancelado'];
 
         if (!estadosValidos.includes(status)) {
             return res.status(400).json({ error: `Estado inválido. Usa uno de: ${estadosValidos.join(', ')}` });
@@ -128,6 +128,37 @@ const marcarCompletado = async (req, res) => {
     }
 };
 
+// 4b. CANCELAR UN PEDIDO (cliente arrepentido, producto agotado, precio que cambio y no lo acepto...)
+// Se permite hasta "pagado" (aun no comprado en la tienda). Si ya estaba pagado, hay que reembolsar.
+const cancelarPedido = async (req, res) => {
+    try {
+        const carrito = await Cart.findById(req.params.id);
+        if (!carrito) {
+            return res.status(404).json({ error: 'Carrito no encontrado' });
+        }
+        if (!['cotizando', 'pendiente_pago', 'pagado'].includes(carrito.status)) {
+            return res.status(400).json({
+                error: `Este carrito está en estado "${carrito.status}". Solo se cancelan pedidos en cotizando, pendiente de pago o pagados.`
+            });
+        }
+
+        const estabaPagado = carrito.status === 'pagado';
+        carrito.estadoAlCancelar = carrito.status;
+        carrito.status = 'cancelado';
+        carrito.canceladoAt = new Date();
+        carrito.canceladoPor = 'admin';
+        await carrito.save();
+
+        res.json({
+            mensaje: estabaPagado ? '🚫 Pedido cancelado. Recuerda devolverle el pago al cliente.' : '🚫 Pedido cancelado.',
+            carrito
+        });
+    } catch (error) {
+        console.error('❌ Error al cancelar el pedido:', error.message);
+        res.status(500).json({ error: 'Error interno al cancelar el pedido' });
+    }
+};
+
 // 4. VERIFICAR PRECIOS ACTUALES vs los cotizados (antes de comprar en la tienda real)
 // No modifica el carrito: solo compara. La decision de que hacer si cambio el
 // precio queda en manos del admin.
@@ -220,7 +251,7 @@ const obtenerEstadisticas = async (req, res) => {
         ]);
 
         const redondear = (n) => parseFloat((n || 0).toFixed(2));
-        const conteos = { cotizando: 0, pendiente_pago: 0, pagado: 0, completado: 0 };
+        const conteos = { cotizando: 0, pendiente_pago: 0, pagado: 0, completado: 0, cancelado: 0 };
         porEstado.forEach(e => { conteos[e._id] = e.total; });
 
         const mesActualClave = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE_REPORTES, year: 'numeric', month: '2-digit' })
@@ -279,4 +310,4 @@ const restablecerPassword = async (req, res) => {
     }
 };
 
-module.exports = { restablecerPassword, obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas };
+module.exports = { cancelarPedido, restablecerPassword, obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas };

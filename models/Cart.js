@@ -29,8 +29,13 @@ const cartSchema = new mongoose.Schema({
     status: {
         type: String,
         default: 'activo',
-        enum: ['activo', 'cotizando', 'pendiente_pago', 'pagado', 'completado']
+        enum: ['activo', 'cotizando', 'pendiente_pago', 'pagado', 'completado', 'cancelado']
     },
+
+    // Datos de la cancelacion. estadoAlCancelar = 'pagado' significa que hay que devolverle el dinero.
+    canceladoAt: { type: Date },
+    canceladoPor: { type: String, enum: ['cliente', 'admin'] },
+    estadoAlCancelar: { type: String },
 
     // Costo de envío final, asignado por el administrador al resolver la cotización
     costoEnvio: {
