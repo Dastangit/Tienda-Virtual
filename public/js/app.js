@@ -135,6 +135,9 @@ $('#loginForm').addEventListener('submit', async (e) => {
   }
 });
 
+// "¿Olvidaste tu contraseña?": abre WhatsApp con el mensaje ya escrito
+$('#forgotLink').href = `${PAYMENT_CONTACT_URL}?text=${encodeURIComponent('Hola, olvidé mi contraseña de Tienda Virtual. Mi teléfono registrado es: ')}`;
+
 $('#registerForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   setError('registerForm', '');
@@ -705,6 +708,30 @@ async function renderOrders() {
     `;
   }).join('');
 }
+
+// ---------- cambiar contraseña ----------
+$('#passwordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setError('passwordForm', '');
+  const fd = new FormData(e.target);
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  try {
+    const data = await api('/api/users/password', {
+      method: 'PUT',
+      body: JSON.stringify({ actual: fd.get('actual'), nueva: fd.get('nueva') })
+    });
+    // El servidor invalida los tokens anteriores y devuelve uno nuevo para seguir conectado
+    setToken(data.token);
+    e.target.reset();
+    e.target.closest('details').open = false;
+    toast('Contraseña actualizada');
+  } catch (err) {
+    setError('passwordForm', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 // ---------- boot ----------
 (function boot() {

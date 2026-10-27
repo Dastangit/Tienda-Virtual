@@ -66,6 +66,16 @@
         </table>
       </details>
 
+      <details class="stats-details reset-box">
+        <summary>Restablecer contraseña de un cliente</summary>
+        <form id="resetForm" class="quote-assign-form">
+          <input type="tel" name="phone" placeholder="Teléfono del cliente (+53...)" required>
+          <button type="submit" class="btn btn-stamp btn-sm">Generar contraseña temporal</button>
+        </form>
+        <div id="resetResult" class="reset-result" hidden></div>
+        <p class="form-error" data-error-for="resetForm"></p>
+      </details>
+
       <div class="source-toggle admin-tabs" role="radiogroup" aria-label="Estado">
         <button type="button" class="source-btn is-active" data-status="cotizando">Cotizando</button>
         <button type="button" class="source-btn" data-status="pendiente_pago">Pendiente de pago</button>

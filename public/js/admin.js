@@ -396,6 +396,37 @@ async function onPriceCheckClick(e) {
   }
 }
 
+// ---------- restablecer contraseña de un cliente ----------
+$('#resetForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setError('resetForm', '');
+  const resultEl = $('#resetResult');
+  resultEl.hidden = true;
+  const fd = new FormData(e.target);
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  try {
+    const data = await api('/api/admin/usuarios/restablecer-password', {
+      method: 'POST',
+      body: JSON.stringify({ phone: fd.get('phone') })
+    });
+    const tel = telefonoWhatsapp(data.cliente.phone);
+    const nombre = (data.cliente.name || '').split(' ')[0];
+    const texto = `Hola${nombre ? ' ' + nombre : ''} \u{1F44B} Tu contrase\u00f1a temporal de Tienda Virtual es: ${data.temporal}\nEntra en ${window.location.origin} y c\u00e1mbiala en "Mis cotizaciones" \u2192 "Cambiar mi contrase\u00f1a".`;
+    const waUrl = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(texto)}` : '';
+    resultEl.innerHTML = `
+      <span>${escapeHtml(data.cliente.name)} · ${escapeHtml(data.cliente.phone)} · temporal:</span>
+      <code>${escapeHtml(data.temporal)}</code>
+      ${waUrl ? `<a class="btn btn-sm btn-whatsapp" href="${waUrl}" target="_blank" rel="noopener noreferrer">Enviar por WhatsApp</a>` : ''}
+    `;
+    resultEl.hidden = false;
+    e.target.reset();
+  } catch (err) {
+    setError('resetForm', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 (function boot() {
   if (state.token) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
-const { registrarUsuario, loginUsuario } = require('../controllers/authController');
+const { registrarUsuario, loginUsuario, cambiarPassword } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware'); // <-- 1. Importamos al portero
 
 // Freno contra fuerza bruta: maximo 10 intentos de login por IP cada 15 minutos
@@ -36,5 +36,9 @@ router.get('/perfil', protect, (req, res) => {
         datosCliente: req.user // Estos datos los extrajo el portero de la base de datos
     });
 });
+
+// Cambiar la contraseña propia (pide la actual). Usa el mismo freno que el login para que
+// un token robado no sirva para adivinar la contraseña a fuerza de intentos.
+router.put('/password', protect, loginLimiter, cambiarPassword);
 
 module.exports = router;

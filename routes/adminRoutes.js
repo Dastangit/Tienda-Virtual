@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas } = require('../controllers/adminController');
+const { restablecerPassword, obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas } = require('../controllers/adminController');
 const mongoose = require('mongoose');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -29,5 +29,8 @@ router.put('/carritos/:id/completar', protect, admin, marcarCompletado);
 
 // GET /api/admin/carritos/:id/verificar-precios -> compara precio cotizado vs precio actual en la tienda
 router.get('/carritos/:id/verificar-precios', protect, admin, verificarPrecios);
+
+// POST /api/admin/usuarios/restablecer-password -> contraseña temporal para un cliente que la olvido
+router.post('/usuarios/restablecer-password', protect, admin, restablecerPassword);
 
 module.exports = router;

@@ -19,6 +19,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['cliente', 'admin'],
         default: 'cliente'
+    },
+    // Cuando cambia la contrasena, los tokens emitidos ANTES dejan de valer (authMiddleware):
+    // asi un restablecimiento cierra la sesion en el telefono que el cliente perdio o presto.
+    passwordChangedAt: {
+        type: Date
     }
 }, { timestamps: true });
 
@@ -32,6 +37,10 @@ userSchema.pre('save', async function () {
     }
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
+    // Al crear la cuenta no hace falta: no existe ningun token anterior
+    if (!this.isNew) {
+        this.passwordChangedAt = new Date();
+    }
 });
 
 module.exports = mongoose.model('User', userSchema);

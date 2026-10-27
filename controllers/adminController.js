@@ -1,4 +1,7 @@
+const crypto = require('crypto');
 const Cart = require('../models/Cart');
+const User = require('../models/User');
+const { normalizarTelefono } = require('./authController');
 const { obtenerProductoAmazon, obtenerProductoShein } = require('./searchController');
 const { calcularPrecioFinal } = require('../utils/pricing');
 
@@ -238,4 +241,37 @@ const obtenerEstadisticas = async (req, res) => {
     }
 };
 
-module.exports = { obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas };
+// 6. RESTABLECER LA CONTRASEÑA DE UN CLIENTE (la olvido y te escribio por WhatsApp)
+// Genera una contraseña temporal que el admin le envia; el cliente luego la cambia.
+// Sin letras ni numeros que se confunden al leerlos (0/O, 1/l/I).
+const ALFABETO_TEMPORAL = 'abcdefghjkmnpqrstuvwxyz23456789';
+const restablecerPassword = async (req, res) => {
+    try {
+        const phone = normalizarTelefono(typeof req.body.phone === 'string' ? req.body.phone : '');
+        const digitos = (phone || '').replace('+', '');
+        if (digitos.length < 8) {
+            return res.status(400).json({ error: 'Escribe el teléfono del cliente con código de país' });
+        }
+
+        // El cliente pudo registrarse con o sin "+": probamos ambas formas
+        const user = await User.findOne({ phone: { $in: [`+${digitos}`, digitos] } });
+        if (!user) {
+            return res.status(404).json({ error: 'No hay ningún cliente con ese teléfono' });
+        }
+        if (user.role === 'admin') {
+            return res.status(403).json({ error: 'Las cuentas de administrador no se restablecen desde aquí' });
+        }
+
+        const temporal = Array.from({ length: 8 }, () => ALFABETO_TEMPORAL[crypto.randomInt(ALFABETO_TEMPORAL.length)]).join('');
+        user.password = temporal;
+        await user.save();
+
+        console.log(`🔑 Contraseña restablecida por el admin ${req.user.phone} para el cliente ${user.phone}`);
+        res.json({ mensaje: 'Contraseña temporal generada', cliente: { name: user.name, phone: user.phone }, temporal });
+    } catch (error) {
+        console.error('❌ Error al restablecer la contraseña:', error.message);
+        res.status(500).json({ error: 'Error interno al restablecer la contraseña' });
+    }
+};
+
+module.exports = { restablecerPassword, obtenerCotizaciones, asignarCostoEnvio, confirmarPago, marcarCompletado, verificarPrecios, obtenerEstadisticas };

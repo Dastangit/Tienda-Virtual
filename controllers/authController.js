@@ -93,4 +93,31 @@ const loginUsuario = async (req, res) => {
     }
 };
 
-module.exports = { registrarUsuario, loginUsuario };
+// 3. CAMBIAR MI CONTRASEÑA (cliente logueado; ej. despues de recibir una temporal del admin)
+const cambiarPassword = async (req, res) => {
+    try {
+        const { actual, nueva } = req.body;
+        if (typeof actual !== 'string' || typeof nueva !== 'string' || !actual) {
+            return res.status(400).json({ error: 'Escribe tu contraseña actual y la nueva' });
+        }
+        if (nueva.length < 6) {
+            return res.status(400).json({ error: 'La contraseña nueva debe tener al menos 6 caracteres' });
+        }
+
+        const user = await User.findById(req.user._id);
+        if (!(await bcrypt.compare(actual, user.password))) {
+            return res.status(400).json({ error: 'La contraseña actual no es correcta' });
+        }
+
+        user.password = nueva;
+        await user.save();
+
+        // Los tokens anteriores dejan de valer: devolvemos uno nuevo para que siga conectado aqui
+        res.json({ mensaje: 'Contraseña actualizada', token: generarToken(user._id, user.role) });
+    } catch (error) {
+        console.error('❌ Error al cambiar la contraseña:', error.message);
+        res.status(500).json({ error: 'Error interno al cambiar la contraseña' });
+    }
+};
+
+module.exports = { registrarUsuario, loginUsuario, cambiarPassword, normalizarTelefono };

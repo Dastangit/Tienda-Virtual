@@ -108,6 +108,10 @@
 .btn-whatsapp { background: #25D366; color: #06210f; border: none; text-decoration: none; }
 .btn-whatsapp:hover { filter: brightness(1.08); }
 
+.reset-box { margin-bottom: 14px; }
+.reset-result { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 0.9rem; }
+.reset-result code { font-family: var(--font-mono); font-size: 1.05rem; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+
 @media (max-width: 560px) {
   .quote-assign-form { flex-direction: column; }
   .quote-assign-form .btn { width: 100%; }

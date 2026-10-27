@@ -47,6 +47,7 @@
           <label>Teléfono<input type="tel" name="phone" placeholder="+53 5xxxxxxx" required autocomplete="tel"></label>
           <label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label>
           <button type="submit" class="btn btn-primary">Entrar</button>
+          <p class="legal-hint"><a id="forgotLink" href="#" target="_blank" rel="noopener noreferrer">¿Olvidaste tu contraseña?</a> Escríbenos por WhatsApp y te damos una temporal.</p>
           <p class="form-error" data-error-for="loginForm"></p>
         </form>
 
@@ -163,6 +164,16 @@
         <p>Todavía no tienes cotizaciones confirmadas.</p>
       </div>
       <div id="ordersContent"></div>
+
+      <details class="account-box">
+        <summary>Cambiar mi contraseña</summary>
+        <form id="passwordForm" class="auth-form">
+          <label>Contraseña actual<input type="password" name="actual" required autocomplete="current-password"></label>
+          <label>Contraseña nueva<input type="password" name="nueva" required minlength="6" autocomplete="new-password"></label>
+          <button type="submit" class="btn btn-primary btn-sm">Guardar contraseña</button>
+          <p class="form-error" data-error-for="passwordForm"></p>
+        </form>
+      </details>
     </section>
 
     <!-- ===== SERVICIOS ===== -->

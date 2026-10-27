@@ -25,6 +25,12 @@ const protect = async (req, res, next) => {
             return res.status(401).json({ error: 'No autorizado, el token pertenece a un usuario que ya no existe' });
         }
 
+        // Token emitido antes del ultimo cambio de contrasena: ya no sirve.
+        // (iat viene en segundos; se compara con 1 s de holgura por el redondeo)
+        if (user.passwordChangedAt && decoded.iat * 1000 < user.passwordChangedAt.getTime() - 1000) {
+            return res.status(401).json({ error: 'Tu contraseña cambió. Inicia sesión de nuevo.' });
+        }
+
         req.user = user;
 
         // 4. Todo en orden, pasamos el control a la siguiente función (next)

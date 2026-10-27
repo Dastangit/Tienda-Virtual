@@ -841,3 +841,7 @@ input[type="number"]:focus, .filter-field select:focus { outline: 2px solid var(
   .filter-grid-inline { grid-template-columns: 240px 240px auto; }
   .filter-grid-inline .chip-clear { justify-self: start; }
 }
+
+/* ===== cuenta (cambiar contraseña) ===== */
+.account-box { margin-top: 28px; max-width: 880px; margin-left: auto; margin-right: auto; }
+.account-box summary { cursor: pointer; color: var(--text-soft); font-size: 0.9rem; margin-bottom: 14px; }
