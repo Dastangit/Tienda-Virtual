@@ -43,4 +43,8 @@ const cartSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Un solo carrito "activo" por cliente. Sin esto, un doble clic en "Agregar" creaba dos
+// carritos activos a la vez y uno de los productos quedaba perdido en el segundo.
+cartSchema.index({ user: 1 }, { unique: true, partialFilterExpression: { status: 'activo' } });
+
 module.exports = mongoose.model('Cart', cartSchema);

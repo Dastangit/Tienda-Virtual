@@ -52,16 +52,19 @@ const agregarAlCarrito = async (req, res) => {
         const precioFinalCliente = calcularPrecioFinal(price);
         const image = productoCache.images && productoCache.images[0];
 
-        // Buscamos si el usuario ya tiene un carrito abierto
+        // Buscamos el carrito abierto del usuario o se lo creamos. Si dos peticiones llegan a la
+        // vez (doble clic), el indice unico deja crear solo uno: la otra lo vuelve a buscar.
         let carrito = await Cart.findOne({ user: req.user._id, status: 'activo' });
-
         if (!carrito) {
-            // Si no tiene carrito, le creamos uno nuevo vacío
-            carrito = new Cart({
-                user: req.user._id,
-                items: []
-            });
-        } else if (carrito.items.length > 0) {
+            try {
+                carrito = await Cart.create({ user: req.user._id, items: [] });
+            } catch (error) {
+                if (error.code !== 11000) throw error;
+                carrito = await Cart.findOne({ user: req.user._id, status: 'activo' });
+            }
+        }
+
+        if (carrito.items.length > 0) {
             // REGLA DE NEGOCIO: No mezclar Amazon con Shein
             const fuenteActual = carrito.items[0].source;
             if (fuenteActual !== source) {
