@@ -723,12 +723,21 @@ a.btn { text-decoration: none; display: inline-block; text-align: center; }
 }
 
 /* ===== responsive ===== */
+/* Textos cortos para el celular (ej. "Cotizaciones" en vez de "Mis cotizaciones" en el menu) */
+.solo-movil { display: none; }
+@media (max-width: 560px) { .solo-movil { display: inline; } }
+
 @media (max-width: 560px) {
   .steps { grid-template-columns: 1fr; }
   .results-grid { grid-template-columns: repeat(2, 1fr); }
   .service-grid { grid-template-columns: 1fr; }
-  .nav { gap: 0; }
-  .nav-link { padding: 8px 8px; font-size: 0.85rem; }
+  /* El menu no cabe junto al logo: baja a su propia fila, a todo el ancho y sin cortar opciones */
+  .topbar { padding: 14px 0 8px; }
+  .topbar-inner { flex-wrap: wrap; row-gap: 10px; }
+  .nav { gap: 0; justify-content: space-between; flex-wrap: wrap; margin: 0 -6px; width: calc(100% + 12px); }
+  .nav-link { padding: 8px 5px; font-size: 0.85rem; white-space: nowrap; }
+  .nav-exit { margin-left: 0; }
+  .solo-pc { display: none; }
   .modal-gallery { grid-template-columns: repeat(2, 1fr); }
   .modal-gallery img:first-child { grid-column: span 2; }
 }
