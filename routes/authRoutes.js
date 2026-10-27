@@ -13,10 +13,12 @@ const loginLimiter = rateLimit({
     message: { error: 'Demasiados intentos. Espera 15 minutos e inténtalo de nuevo.' }
 });
 
-// Freno para registros masivos: maximo 20 cuentas nuevas por IP cada hora
+// Freno para registros masivos: maximo 5 cuentas nuevas por IP cada hora.
+// No se baja mas porque en Cuba muchos clientes salen a internet por la misma IP (red movil
+// compartida). La proteccion fuerte de los creditos es el tope diario de searchController.
 const registerLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
-    limit: 20,
+    limit: 5,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Demasiados registros desde esta conexión. Inténtalo más tarde.' }

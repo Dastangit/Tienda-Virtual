@@ -18,9 +18,6 @@ const connectDB = require('./config/db');
 // 1. ABRIR LA CAJA FUERTE: Esto debe ir al principio para que las variables existan
 dotenv.config();
 
-// 2. CONECTAR A MONGODB: Ejecutamos la función que creaste en el paso anterior
-connectDB();
-
 // 3. CREAR EL SERVIDOR: Inicializamos Express
 const app = express();
 
@@ -75,8 +72,14 @@ const adminRoutes = require('./routes/adminRoutes');
 app.use('/api/admin', adminRoutes);
 // ---------------------------------------------------
 
-// 6. ENCENDER EL MOTOR: Le decimos al servidor en qué "puerto" debe escuchar
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Servidor de Express encendido y corriendo en el puerto ${PORT}`);
-});
+// 6. CONECTAR A MONGODB Y ENCENDER EL MOTOR: solo cuando se ejecuta "node server.js".
+// Las pruebas (tests/) importan "app" sin encender el servidor y usan su propia base temporal.
+if (require.main === module) {
+    connectDB();
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`Servidor de Express encendido y corriendo en el puerto ${PORT}`);
+    });
+}
+
+module.exports = app;

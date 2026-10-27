@@ -1,4 +1,5 @@
 const ProductCache = require('../models/ProductCache');
+const UsoProveedor = require('../models/UsoProveedor');
 const { calcularPrecioFinal, precioOrigenDesdeFinal } = require('../utils/pricing');
 const { detectarPaquete } = require('../utils/productParser');
 
@@ -6,6 +7,28 @@ const { detectarPaquete } = require('../utils/productParser');
 // (precios en USD) y Amazon la version es_US, que traduce los titulos que el vendedor tiene en espanol.
 const IDIOMA_SHEIN = 'es';
 const IDIOMA_AMAZON = 'es_US';
+
+// Tope global de llamadas pagadas a Scrapingdog/Omkar por dia (todos los clientes juntos).
+// El limite por usuario de searchRoutes no basta: alguien puede crear muchas cuentas y gastar
+// los creditos. Al llegar al tope, los clientes ven un aviso y nadie gasta mas hasta manana.
+// Los admin no se bloquean (verificar precios antes de comprar debe funcionar siempre).
+const TOPE_LLAMADAS_DIARIAS = Number(process.env.TOPE_LLAMADAS_DIARIAS) || 300;
+const ZONA_HORARIA = process.env.STATS_TIMEZONE || 'America/Santo_Domingo';
+
+const reservarLlamadaProveedor = async (esAdmin) => {
+    const dia = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(new Date()); // "2026-10-26"
+    const uso = await UsoProveedor.findOneAndUpdate(
+        { _id: dia },
+        { $inc: { llamadas: 1 } },
+        { upsert: true, returnDocument: 'after' }
+    );
+    if (!esAdmin && uso.llamadas > TOPE_LLAMADAS_DIARIAS) {
+        console.error(`🚫 Tope diario de llamadas al proveedor alcanzado (${TOPE_LLAMADAS_DIARIAS})`);
+        const error = new Error('Llegamos al límite de búsquedas por hoy. Inténtalo de nuevo mañana o escríbenos por WhatsApp.');
+        error.status = 503;
+        throw error;
+    }
+};
 
 // --- CONEXIÓN CON APIs EXTERNAS REALES ---
 
@@ -291,17 +314,16 @@ const searchProduct = async (req, res) => {
             return res.json({ mensaje: 'Recuperado desde Caché', data: productoResponse });
         }
 
-        console.log(`🐌 Consumiendo API externa para ${source.toUpperCase()}...`);
-
-        let externalApiData;
-
-        if (source === 'amazon') {
-            externalApiData = await obtenerProductoAmazon(originalId);
-        } else if (source === 'shein') {
-            externalApiData = await obtenerProductoShein(originalId);
-        } else {
+        if (source !== 'amazon' && source !== 'shein') {
             return res.status(400).json({ error: 'Fuente no soportada. Usa "amazon" o "shein".' });
         }
+
+        console.log(`🐌 Consumiendo API externa para ${source.toUpperCase()}...`);
+        await reservarLlamadaProveedor(req.user?.role === 'admin');
+
+        const externalApiData = source === 'amazon'
+            ? await obtenerProductoAmazon(originalId)
+            : await obtenerProductoShein(originalId);
 
         if (!externalApiData.title || !externalApiData.price) {
             return res.status(502).json({ error: `No se pudo extraer el producto desde ${source.toUpperCase()}. Verifica el ID/URL.` });
@@ -332,6 +354,9 @@ const searchProduct = async (req, res) => {
         // Si falló el proveedor externo (Scrapingdog/Omkar Cloud caído o lento), le
         // mostramos al cliente un mensaje claro en vez de un genérico "error interno".
         const esProveedorExterno = /Scrapingdog respondió|Omkar Cloud|no respondió a tiempo/.test(error.message);
+        if (error.status === 503) {
+            return res.status(503).json({ error: error.message });
+        }
         res.status(esProveedorExterno ? 502 : 500).json({
             error: esProveedorExterno ? error.message : 'Error interno del servidor'
         });
@@ -381,6 +406,7 @@ const searchByKeyword = async (req, res) => {
             : `shein|${IDIOMA_SHEIN}|${texto}|${ORDEN_SHEIN[orden]}|${minOrigen || ''}|${maxOrigen || ''}|${page}`;
         let busqueda = leerCache(claveCache);
         if (!busqueda) {
+            await reservarLlamadaProveedor(req.user?.role === 'admin');
             busqueda = source === 'amazon'
                 ? await buscarPorTextoAmazon(query, { page })
                 : await buscarPorTextoShein(query, { sort: ORDEN_SHEIN[orden], minPrecio: minOrigen, maxPrecio: maxOrigen, page });
@@ -404,6 +430,9 @@ const searchByKeyword = async (req, res) => {
     } catch (error) {
         console.error('❌ Error en la búsqueda por texto:', error.message);
         const esProveedorExterno = /Scrapingdog respondió|Omkar Cloud|no respondió a tiempo/.test(error.message);
+        if (error.status === 503) {
+            return res.status(503).json({ error: error.message });
+        }
         res.status(esProveedorExterno ? 502 : 500).json({
             error: esProveedorExterno ? error.message : 'Error interno al buscar productos'
         });
