@@ -189,6 +189,9 @@ h3 { font-size: 1.15rem; }
 
 .auth-form { display: flex; flex-direction: column; gap: 14px; max-width: 340px; }
 .auth-hint { margin: -6px 0 0; font-size: 0.78rem; color: var(--text-soft); line-height: 1.4; }
+.forgot-hint { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.78rem; color: var(--text-soft); line-height: 1.4; }
+.forgot-hint a { color: var(--cyan); font-weight: 600; font-size: 0.9rem; text-decoration: none; width: fit-content; }
+.forgot-hint a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .auth-form label {
   display: flex;
   flex-direction: column;
