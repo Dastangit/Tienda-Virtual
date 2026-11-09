@@ -53,6 +53,20 @@ const fetchConReintento = async (url, options = {}, intentos = 2, timeoutMs = 15
     }
 };
 
+// Cuando falla el proveedor externo, el cliente no debe ver "Omkar Cloud (Shein) respondió 402":
+// le damos un aviso claro y el detalle técnico queda en el log. El admin sí ve el detalle
+// entre paréntesis (le sirve para saber si es la cuenta, los créditos o una caída).
+const esErrorProveedor = (error) => /Scrapingdog respondió|Omkar Cloud|no respondió a tiempo/.test(error.message);
+
+const mensajeErrorProveedor = (error, source, esAdmin) => {
+    const tienda = source === 'amazon' ? 'Amazon' : 'Shein';
+    const otra = source === 'amazon' ? 'Shein' : 'Amazon';
+    const aviso = /no respondió a tiempo/.test(error.message)
+        ? `${tienda} tardó demasiado en responder. Inténtalo de nuevo en un momento.`
+        : `La búsqueda en ${tienda} no está disponible en este momento. Inténtalo más tarde o busca en ${otra}.`;
+    return esAdmin ? `${aviso} (${error.message})` : aviso;
+};
+
 // Scrapingdog a veces manda el precio como texto con ruido alrededor,
 // ej: "$17.99 with 49 percent savings". Un regex que solo quita letras
 // arrastra los dígitos de "49" y arma un número incorrecto (17.9949).
@@ -353,13 +367,13 @@ const searchProduct = async (req, res) => {
         console.error('❌ Error en el motor de búsqueda:', error.message);
         // Si falló el proveedor externo (Scrapingdog/Omkar Cloud caído o lento), le
         // mostramos al cliente un mensaje claro en vez de un genérico "error interno".
-        const esProveedorExterno = /Scrapingdog respondió|Omkar Cloud|no respondió a tiempo/.test(error.message);
         if (error.status === 503) {
             return res.status(503).json({ error: error.message });
         }
-        res.status(esProveedorExterno ? 502 : 500).json({
-            error: esProveedorExterno ? error.message : 'Error interno del servidor'
-        });
+        if (esErrorProveedor(error)) {
+            return res.status(502).json({ error: mensajeErrorProveedor(error, req.body?.source, req.user?.role === 'admin') });
+        }
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -429,13 +443,13 @@ const searchByKeyword = async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error en la búsqueda por texto:', error.message);
-        const esProveedorExterno = /Scrapingdog respondió|Omkar Cloud|no respondió a tiempo/.test(error.message);
         if (error.status === 503) {
             return res.status(503).json({ error: error.message });
         }
-        res.status(esProveedorExterno ? 502 : 500).json({
-            error: esProveedorExterno ? error.message : 'Error interno al buscar productos'
-        });
+        if (esErrorProveedor(error)) {
+            return res.status(502).json({ error: mensajeErrorProveedor(error, req.body?.source, req.user?.role === 'admin') });
+        }
+        res.status(500).json({ error: 'Error interno al buscar productos' });
     }
 };
 module.exports = { searchProduct, searchByKeyword, obtenerProductoAmazon, obtenerProductoShein };

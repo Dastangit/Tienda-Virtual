@@ -28,6 +28,10 @@ globalThis.fetch = async (url, options) => {
     }
     if (u.includes('omkar.cloud')) {
         proveedor.llamadas++;
+        // La busqueda "proveedor-caido" simula la cuenta de Omkar sin plan activo (402)
+        if (new URL(u).searchParams.get('query') === 'proveedor-caido') {
+            return Response.json({ code: 'activation_required' }, { status: 402 });
+        }
         return Response.json({ results: [] });
     }
     return fetchReal(url, options);

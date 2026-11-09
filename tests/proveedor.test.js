@@ -37,6 +37,19 @@ test('el admin no se bloquea con el tope diario', async () => {
     await UsoProveedor.deleteMany({});
 });
 
+test('si falla el proveedor, el cliente ve un aviso claro y el admin además el detalle', async () => {
+    const cliente = await h.crearCliente();
+    const r = await h.api('/api/search/query', { method: 'POST', token: cliente.token, body: { query: 'proveedor-caido', source: 'shein' } });
+    assert.equal(r.status, 502);
+    assert.equal(r.data.error, 'La búsqueda en Shein no está disponible en este momento. Inténtalo más tarde o busca en Amazon.');
+
+    const admin = await h.crearAdmin();
+    const ra = await h.api('/api/search/query', { method: 'POST', token: admin.token, body: { query: 'proveedor-caido', source: 'shein' } });
+    assert.equal(ra.status, 502);
+    assert.match(ra.data.error, /no está disponible.*\(Omkar Cloud \(Shein\) respondió 402\)/);
+    await UsoProveedor.deleteMany({});
+});
+
 test('registro: maximo 5 cuentas por IP y hora', async () => {
     h.nuevaIp();
     const estados = [];
