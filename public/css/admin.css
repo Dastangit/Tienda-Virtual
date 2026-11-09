@@ -112,8 +112,19 @@
 .reset-result { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 0.9rem; }
 .reset-result code { font-family: var(--font-mono); font-size: 1.05rem; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 
+/* ----- Que nada empuje la pagina mas alla del ancho de la pantalla ----- */
+main.wrap { min-width: 0; }
+.table-scroll { overflow-x: auto; max-width: 100%; }
+.admin-tabs { flex-wrap: wrap; }
+.admin-tabs .source-btn { flex: 1 1 auto; white-space: nowrap; }
+.quote-card { min-width: 0; }
+.quote-card .order-head { flex-wrap: wrap; gap: 6px; }
+.order-product-title { min-width: 0; overflow-wrap: anywhere; }
+
 @media (max-width: 560px) {
+  main.wrap { padding: 0 16px; }
   .quote-assign-form { flex-direction: column; }
   .quote-assign-form .btn { width: 100%; }
   .admin-head { flex-direction: column; align-items: flex-start; }
+  .admin-tabs .source-btn { flex: 1 1 calc(50% - 4px); }
 }
