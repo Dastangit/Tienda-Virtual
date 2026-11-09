@@ -53,30 +53,34 @@
           <p class="eyebrow">Panel de pedidos</p>
           <h1 id="dashboardTitle">Cotizaciones pendientes</h1>
         </div>
+
+        <div class="admin-head-tools">
+          <details id="statsDetails" class="stats-details" hidden>
+            <summary>Últimos meses</summary>
+            <div class="table-scroll">
+              <table class="stats-months">
+                <thead><tr><th>Mes</th><th>Pedidos</th><th>Facturado</th><th>Margen</th></tr></thead>
+                <tbody id="statsMonths"></tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="stats-details reset-box">
+            <summary>Restablecer contraseña de un cliente</summary>
+            <form id="resetForm" class="quote-assign-form">
+              <input type="tel" name="phone" placeholder="Teléfono del cliente (+53...)" required>
+              <button type="submit" class="btn btn-stamp btn-sm">Generar contraseña temporal</button>
+            </form>
+            <div id="resetResult" class="reset-result" hidden></div>
+            <p class="form-error" data-error-for="resetForm"></p>
+          </details>
+        </div>
+
         <button id="refreshBtn" type="button" class="btn btn-sm btn-ghost">Refrescar</button>
       </div>
 
       <!-- Resumen general -->
       <div id="statsGrid" class="stats-grid" hidden></div>
-      <details id="statsDetails" class="stats-details" hidden>
-        <summary>Últimos meses</summary>
-        <div class="table-scroll">
-          <table class="stats-months">
-            <thead><tr><th>Mes</th><th>Pedidos</th><th>Facturado</th><th>Margen</th></tr></thead>
-            <tbody id="statsMonths"></tbody>
-          </table>
-        </div>
-      </details>
-
-      <details class="stats-details reset-box">
-        <summary>Restablecer contraseña de un cliente</summary>
-        <form id="resetForm" class="quote-assign-form">
-          <input type="tel" name="phone" placeholder="Teléfono del cliente (+53...)" required>
-          <button type="submit" class="btn btn-stamp btn-sm">Generar contraseña temporal</button>
-        </form>
-        <div id="resetResult" class="reset-result" hidden></div>
-        <p class="form-error" data-error-for="resetForm"></p>
-      </details>
 
       <div class="source-toggle admin-tabs" role="radiogroup" aria-label="Estado">
         <button type="button" class="source-btn is-active" data-status="cotizando">Cotizando</button>
